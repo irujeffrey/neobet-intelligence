@@ -158,7 +158,18 @@ async function getJson(url, headers) {
     throw error;
   }
   if (!response.ok) {
-    const error = new Error(`Provider returned HTTP ${response.status}`);
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail = String(body?.error || body?.message || body?.detail || "");
+    } catch {
+      detail = "";
+    }
+    for (const secret of [process.env.API_NINJAS_API_KEY, process.env.FOOTBALL_DATA_TOKEN]) {
+      if (secret) detail = detail.replaceAll(secret, "[redacted]");
+    }
+    detail = detail.replace(/[\r\n\t]+/g, " ").slice(0, 180);
+    const error = new Error(`Provider returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
     error.code = `http_${response.status}`;
     throw error;
   }
@@ -178,11 +189,30 @@ async function fetchFootballData() {
     throw error;
   }
   const now = new Date();
-  const url = new URL("https://api.football-data.org/v4/matches");
-  url.searchParams.set("dateFrom", new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 10));
-  url.searchParams.set("dateTo", new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10));
-  const result = await getJson(url, { "X-Auth-Token": process.env.FOOTBALL_DATA_TOKEN });
-  return { dataset: fromFootballData(Array.isArray(result.matches) ? result.matches : []), requestCount: 1 };
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 14));
+  const endExclusive = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 31));
+  const matches = new Map();
+  let requestCount = 0;
+  for (let cursor = start; cursor < endExclusive;) {
+    const next = new Date(Math.min(cursor.getTime() + 7 * 86400000, endExclusive.getTime()));
+    const url = new URL("https://api.football-data.org/v4/matches");
+    url.searchParams.set("dateFrom", cursor.toISOString().slice(0, 10));
+    url.searchParams.set("dateTo", next.toISOString().slice(0, 10));
+    requestCount += 1;
+    let result;
+    try {
+      result = await getJson(url, { "X-Auth-Token": process.env.FOOTBALL_DATA_TOKEN });
+    } catch (error) {
+      error.requestCount = requestCount;
+      throw error;
+    }
+    for (const match of Array.isArray(result.matches) ? result.matches : []) {
+      matches.set(String(match.id), match);
+    }
+    cursor = next;
+    if (cursor < endExclusive) await new Promise((resolve) => setTimeout(resolve, 6500));
+  }
+  return { dataset: fromFootballData([...matches.values()]), requestCount };
 }
 
 function currentSeason(league, date = new Date()) {
@@ -300,12 +330,12 @@ async function main() {
   const sqlPath = path.join(runnerTemp, "neobet-provider-sync.sql");
   const resultPath = path.join(runnerTemp, "neobet-provider-sync-result.json");
   fs.writeFileSync(sqlPath, `${statements.join("\n\n")}\n`, { encoding: "utf8", mode: 0o600 });
-  fs.writeFileSync(resultPath, JSON.stringify(runs.map(({ providerId, status, requestCount, fixtureCount, errorCode }) => ({
-    provider: providerId, status, request_count: requestCount, fixtures: fixtureCount, error: errorCode,
+  fs.writeFileSync(resultPath, JSON.stringify(runs.map(({ providerId, status, requestCount, fixtureCount, errorCode, errorSummary }) => ({
+    provider: providerId, status, request_count: requestCount, fixtures: fixtureCount, error: errorCode, error_summary: errorSummary,
   }))), { encoding: "utf8", mode: 0o600 });
   console.log(`Prepared D1 import for ${runs.reduce((count, run) => count + run.fixtureCount, 0)} fixtures from ${runs.length} provider(s).`);
   for (const run of runs) {
-    console.log(`${run.providerId}: ${run.status}; ${run.requestCount} request(s); ${run.fixtureCount} fixture(s)${run.errorCode ? `; ${run.errorCode}` : ""}`);
+    console.log(`${run.providerId}: ${run.status}; ${run.requestCount} request(s); ${run.fixtureCount} fixture(s)${run.errorCode ? `; ${run.errorCode}` : ""}${run.errorSummary ? `; ${run.errorSummary}` : ""}`);
   }
 }
 
