@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Publish static website
+    name: Deploy Worker and website
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
