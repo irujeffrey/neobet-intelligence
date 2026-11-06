@@ -3,7 +3,6 @@
   "name": "neobet-intelligence",
   "main": "./src/index.js",
   "compatibility_date": "2026-11-06",
- {
     "d1_databases": [
       {
         "binding": "neobet_intelligence_db",
