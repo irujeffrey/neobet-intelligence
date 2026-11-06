@@ -92,6 +92,30 @@
 
   document.getElementById("mobile-menu").addEventListener("click", () => document.querySelector(".sidebar").classList.toggle("menu-open"));
   document.getElementById("refresh-button").addEventListener("click", () => showToast("No provider configured · No new data requested"));
+
+  async function refreshDatabaseStatus() {
+    const dot = document.getElementById("database-status-dot");
+    const message = document.getElementById("database-status-message");
+    try {
+      const response = await fetch("/api/health", { cache: "no-store" });
+      if (!response.headers.get("content-type")?.includes("application/json")) return;
+      const result = await response.json();
+      if (result.ok && result.schema === "ready") {
+        message.textContent = "Connected";
+        dot.classList.add("connected");
+      } else if (result.database === "schema_pending") {
+        message.textContent = "Migration pending";
+      } else if (result.database === "not_bound") {
+        message.textContent = "Binding pending";
+      } else {
+        message.textContent = "Unavailable";
+      }
+    } catch {
+      message.textContent = "Not connected";
+    }
+  }
+
+  refreshDatabaseStatus();
   window.addEventListener("hashchange", () => {
     const page = window.location.hash.slice(1) || "home";
     if (pageNames[page]) showPageWithoutHistory(page);

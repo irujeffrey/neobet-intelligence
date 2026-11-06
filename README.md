@@ -12,9 +12,13 @@ The shared `window.NeoBet.getCertainty(prediction)` function in `public/src/app.
 
 ## Deployment foundation
 
-`wrangler.jsonc` points Cloudflare Workers Static Assets at `public/` so project notes and workflows are not published as website files. No sports API keys, provider credentials, database, or external data service are configured. Before public data display, verify provider display and advertising permissions and wire the site to server-side Workers endpoints. Never place secret API credentials in frontend files.
+`wrangler.jsonc` points Cloudflare Workers Static Assets at `public/` so project notes and workflows are not published as website files. The D1 binding has not been connected yet. No sports API keys, provider credentials, or external data service are configured. Before public data display, verify provider display and advertising permissions. Never place secret API credentials in frontend files.
 
 After the first GitHub validation run succeeds and the Cloudflare secrets are configured, open **Actions → Deploy NeoBet to Cloudflare → Run workflow** to publish. The deploy workflow is manual so you can review checks before publishing.
+
+## Database setup
+
+The D1 schema is versioned in `migrations/`. After adding the D1 binding and ID to `wrangler.jsonc`, use the manual **Create NeoBet D1 database** workflow once, then **Apply NeoBet D1 migrations**. The D1 and Workers APIs are read-only in this first database stage; there is no public insert or admin endpoint.
 
 ## Project notes
 
