@@ -3,15 +3,14 @@
   "name": "neobet-intelligence",
   "main": "./src/index.js",
   "compatibility_date": "2026-11-06",
-    "d1_databases": [
-      {
-        "binding": "DB",
-        "database_name": "neobet-intelligence-db",
-        "database_id": "efb484b0-ea00-49c8-9955-165b1f003b95",
-        "migrations_dir": "migrations"
-      }
-    ],
-  
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "neobet-intelligence-db",
+      "database_id": "efb484b0-ea00-49c8-9955-165b1f003b95",
+      "migrations_dir": "migrations"
+    }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",

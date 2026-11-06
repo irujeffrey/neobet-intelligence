@@ -1,10 +1,10 @@
 # NeoBet Intelligence
 
-Responsive, zero-dependency website foundation for transparent football and basketball analysis. The current public preview is intentionally data-empty: no sports provider, licensed odds feed, or calibrated model is configured, so it does not display invented fixtures, picks, results, or performance figures.
+Responsive, zero-dependency website foundation for transparent football and basketball analysis. Provider sync is prepared for football-data.org and API Ninjas. The site will not show invented picks or performance figures; calibrated model outputs are still to be built.
 
 ## GitHub-based validation
 
-No local preview or test command is required. The GitHub Actions workflow in `.github/workflows/validate.yml` checks JavaScript syntax and confirms the homepage, stylesheet, and JavaScript asset respond when a change is pushed, a pull request is opened, or the workflow is run manually. View the result in the repository's **Actions** tab.
+No local preview or test command is required. GitHub Actions checks JavaScript syntax and confirms the homepage, stylesheet, and JavaScript asset respond. Provider sync and remote D1 import also run on GitHub-hosted runners.
 
 ## Certainty system
 
@@ -12,13 +12,13 @@ The shared `window.NeoBet.getCertainty(prediction)` function in `public/src/app.
 
 ## Deployment foundation
 
-`wrangler.jsonc` points Cloudflare Workers Static Assets at `public/` so project notes and workflows are not published as website files. The D1 binding has not been connected yet. No sports API keys, provider credentials, or external data service are configured. Before public data display, verify provider display and advertising permissions. Never place secret API credentials in frontend files.
+`wrangler.jsonc` points Cloudflare Workers Static Assets at `public/` and binds the existing D1 database. Provider keys belong only in the GitHub Actions secrets `API_NINJAS_API_KEY` and `FOOTBALL_DATA_TOKEN`. The current provider approval is for a no-ad site; never place credentials in frontend files.
 
-After the first GitHub validation run succeeds and the Cloudflare secrets are configured, open **Actions → Deploy NeoBet to Cloudflare → Run workflow** to publish. The deploy workflow is manual so you can review checks before publishing.
+After uploading changes, apply pending D1 migrations, then run **Deploy NeoBet to Cloudflare**. The deploy workflow is manual so you can review checks before publishing.
 
 ## Database setup
 
-The D1 schema is versioned in `migrations/`. After adding the D1 binding and ID to `wrangler.jsonc`, use the manual **Create NeoBet D1 database** workflow once, then **Apply NeoBet D1 migrations**. The D1 and Workers APIs are read-only in this first database stage; there is no public insert or admin endpoint.
+The D1 schema is versioned in `migrations/`. The GitHub-hosted **Sync NeoBet sports data** workflow fetches licensed provider records and imports them into D1. The public API exposes fixtures and sync status, while predictions remain empty until a calibrated model is built.
 
 ## Project notes
 
