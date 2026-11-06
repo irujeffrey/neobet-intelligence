@@ -10,7 +10,7 @@
         "database_id": "efb484b0-ea00-49c8-9955-165b1f003b95",
         "migrations_dir": "migrations"
       }
-    ]
+    ],
   
   "assets": {
     "directory": "./public",
