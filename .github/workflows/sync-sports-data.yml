@@ -1,0 +1,50 @@
+name: Sync NeoBet sports data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Fetch provider data into D1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch and prepare provider data
+        id: prepare
+        run: node scripts/sync-sports-data.mjs
+        env:
+          API_NINJAS_API_KEY: ${{ secrets.API_NINJAS_API_KEY }}
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+
+      - name: Import data into remote D1
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute neobet-intelligence-db --remote --file ${{ runner.temp }}/neobet-provider-sync.sql
+
+      - name: Summarize provider sync
+        if: always()
+        shell: bash
+        env:
+          RESULT_FILE: ${{ runner.temp }}/neobet-provider-sync-result.json
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RESULT_FILE" ]]; then
+            echo "No provider sync result was produced. Check the fetch step and repository secrets."
+            exit 1
+          fi
+          node --input-type=module -e 'import fs from "node:fs";const rows=JSON.parse(fs.readFileSync(process.env.RESULT_FILE,"utf8"));for(const row of rows){const suffix=row.error?"; "+row.error:"";const line=row.provider+": "+row.status+"; "+row.fixtures+" fixtures; "+row.request_count+" requests"+suffix;console.log(line);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"- "+line+"\n")}if(rows.some(row=>row.status!=="succeeded"))process.exit(1)'
