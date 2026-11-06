@@ -47,7 +47,7 @@
   const homeMarkup = document.getElementById("page-content").innerHTML;
   const emptyNotice = (label, title, body) => `<div class="page-empty"><div class="page-empty-mark">✳</div><div><div class="empty-label"><span></span> ${label}</div><h3>${title}</h3><p>${body}</p></div></div>`;
   const pageMarkup = {
-    football: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Football<span class="title-period">.</span></h1><p class="subhead">Verified fixtures, calibrated probabilities, and transparent match analysis.</p></div><span class="page-status">● FOOTBALL-DATA.ORG FEED</span></div>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixture data and predictions are separate.", "Run the GitHub sports-data sync to load fixtures. Picks appear after a calibrated football model passes quality checks. Use the fixture feed link below to review imported data.")}<p class="panel-footnote"><a href="/api/fixtures?sport=football">Open football fixture data</a></p><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
+    football: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Football<span class="title-period">.</span></h1><p class="subhead">Upcoming fixtures from Football-Data.org, shown in your local time.</p></div><span class="page-status">● FOOTBALL-DATA.ORG FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-football>↻ Refresh</button></div><div class="football-fixture-list" id="football-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming football fixtures…</p></div></section>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixtures are not predictions.", "Upcoming matches are shown from the provider feed. Probabilities and picks will appear only after a calibrated football model passes quality checks.")}<section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
     basketball: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Basketball<span class="title-period">.</span></h1><p class="subhead">Team strength, pace-aware projections, and transparent match analysis.</p></div><span class="page-status">● API NINJAS FEED</span></div>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixture data and predictions are separate.", "Run the GitHub sports-data sync to load NBA/WNBA schedules and results. Picks appear after a calibrated basketball model passes quality checks. Use the fixture feed link below to review imported data.")}<p class="panel-footnote"><a href="/api/fixtures?sport=basketball">Open basketball fixture data</a></p><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
     picks: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHORTLIST</div><h1>Best picks<span class="title-period">.</span></h1><p class="subhead">Ranked by calibrated probability, data reliability, and quality checks.</p></div></div>${emptyNotice("NO ELIGIBLE PICKS", "Nothing is ranked without evidence.", "Picks will appear only when model outputs are calibrated and pass data quality and freshness checks. Attractive odds alone cannot move a selection up the ranking.")}<section class="page-panel"><div class="eyebrow small-eyebrow">RANKING PRINCIPLES</div><div class="principle-grid"><div><b>01</b><strong>Calibrated probability</strong><small>Model output on a validated probability scale.</small></div><div><b>02</b><strong>Data reliability</strong><small>Fresh, complete, and attributable source data.</small></div><div><b>03</b><strong>Betting value</strong><small>Shown separately when licensed odds exist.</small></div></div></section>`,
     performance: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRACK RECORD</div><h1>Performance<span class="title-period">.</span></h1><p class="subhead">A transparent record of published predictions and settled outcomes.</p></div></div><section class="stats-grid page-stats"><article class="stat-card"><div class="stat-heading">SETTLED PREDICTIONS</div><div class="stat-value">—</div><div class="stat-foot muted">No settled records</div></article><article class="stat-card"><div class="stat-heading">ACCURACY</div><div class="stat-value">—<small>%</small></div><div class="stat-foot muted">Not yet available</div></article><article class="stat-card"><div class="stat-heading">BRIER SCORE</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article><article class="stat-card"><div class="stat-heading">LOG LOSS</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article></section>${emptyNotice("NO SETTLED RESULTS", "The record begins when predictions are published.", "Performance will be calculated from the permanent prediction audit. No historical results or ROI are fabricated.")}`,
@@ -74,6 +74,7 @@
     const content = document.getElementById("page-content");
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
+    if (page === "football") loadFootballFixtures(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
     content.querySelectorAll(".view-all").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showPage(link.getAttribute("href").slice(1)); }));
     document.querySelector(".sidebar").classList.remove("menu-open");
@@ -157,9 +158,93 @@
     const content = document.getElementById("page-content");
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
+    if (page === "football") loadFootballFixtures(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
     content.querySelectorAll(".view-all").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showPage(link.getAttribute("href").slice(1)); }));
     if (page === "home") refreshProviderStatus();
+  }
+
+  async function loadFootballFixtures(content) {
+    const list = content.querySelector("#football-fixture-list");
+    if (!list) return;
+
+    const refreshButton = content.querySelector("[data-refresh-football]");
+    if (refreshButton) {
+      refreshButton.onclick = () => loadFootballFixtures(content);
+    }
+
+    list.replaceChildren();
+    const loading = document.createElement("p");
+    loading.className = "fixture-message";
+    loading.textContent = "Loading upcoming football fixtures…";
+    list.append(loading);
+
+    try {
+      const response = await fetch("/api/fixtures?sport=football", { cache: "no-store" });
+      if (!response.ok) throw new Error("Fixture service unavailable");
+      const result = await response.json();
+      const fixtures = (Array.isArray(result.fixtures) ? result.fixtures : [])
+        .filter((fixture) => fixture.sport === "football" && Number.isFinite(Date.parse(fixture.scheduled_at)) && Date.parse(fixture.scheduled_at) > Date.now())
+        .sort((a, b) => Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at));
+
+      if (!fixtures.length) {
+        const empty = document.createElement("p");
+        empty.className = "fixture-message";
+        empty.textContent = "No upcoming football fixtures are available in the current feed.";
+        list.replaceChildren(empty);
+        return;
+      }
+
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        weekday: "short", year: "numeric", month: "short", day: "numeric",
+        hour: "numeric", minute: "2-digit", timeZoneName: "short",
+      });
+      const cards = document.createDocumentFragment();
+      fixtures.forEach((fixture) => {
+        const card = document.createElement("article");
+        card.className = "fixture-card";
+
+        const meta = document.createElement("div");
+        meta.className = "fixture-card-meta";
+        const competition = document.createElement("span");
+        competition.className = "fixture-competition";
+        competition.textContent = fixture.competition || "Football";
+        const status = document.createElement("span");
+        status.className = "fixture-status";
+        status.textContent = "Scheduled";
+        meta.append(competition, status);
+
+        const teams = document.createElement("div");
+        teams.className = "fixture-teams";
+        const home = document.createElement("strong");
+        home.textContent = fixture.home_team || "Home team";
+        const versus = document.createElement("span");
+        versus.className = "fixture-versus";
+        versus.textContent = "vs";
+        const away = document.createElement("strong");
+        away.textContent = fixture.away_team || "Away team";
+        teams.append(home, versus, away);
+
+        const kickoff = document.createElement("time");
+        kickoff.className = "fixture-kickoff";
+        kickoff.dateTime = fixture.scheduled_at;
+        kickoff.textContent = formatter.format(new Date(fixture.scheduled_at));
+
+        card.append(meta, teams, kickoff);
+        cards.append(card);
+      });
+      list.replaceChildren(cards);
+    } catch {
+      const error = document.createElement("p");
+      error.className = "fixture-message fixture-error";
+      error.textContent = "Fixtures could not be loaded. Please try again.";
+      const retry = document.createElement("button");
+      retry.className = "text-button";
+      retry.type = "button";
+      retry.textContent = "Retry";
+      retry.addEventListener("click", () => loadFootballFixtures(content));
+      list.replaceChildren(error, retry);
+    }
   }
 
   let toastTimer;
