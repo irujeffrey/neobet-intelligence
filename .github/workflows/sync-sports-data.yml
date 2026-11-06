@@ -47,4 +47,4 @@ jobs:
             echo "No provider sync result was produced. Check the fetch step and repository secrets."
             exit 1
           fi
-          node --input-type=module -e 'import fs from "node:fs";const rows=JSON.parse(fs.readFileSync(process.env.RESULT_FILE,"utf8"));for(const row of rows){const suffix=row.error?"; "+row.error:"";const line=row.provider+": "+row.status+"; "+row.fixtures+" fixtures; "+row.request_count+" requests"+suffix;console.log(line);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"- "+line+"\n")}if(rows.some(row=>row.status!=="succeeded"))process.exit(1)'
+          node --input-type=module -e 'import fs from "node:fs";const rows=JSON.parse(fs.readFileSync(process.env.RESULT_FILE,"utf8"));for(const row of rows){const code=row.error?"; "+row.error:"";const detail=row.error_summary?" — "+row.error_summary:"";const line=row.provider+": "+row.status+"; "+row.fixtures+" fixtures; "+row.request_count+" requests"+code+detail;console.log(line);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"- "+line+"\n")}if(rows.some(row=>row.status!=="succeeded"))process.exit(1)'
