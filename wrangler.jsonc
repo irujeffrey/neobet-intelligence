@@ -5,7 +5,7 @@
   "compatibility_date": "2026-11-06",
     "d1_databases": [
       {
-        "binding": "neobet_intelligence_db",
+        "binding": "db",
         "database_name": "neobet-intelligence-db",
         "database_id": "efb484b0-ea00-49c8-9955-165b1f003b95",
         "migrations_dir": "migrations"
