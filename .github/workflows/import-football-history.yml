@@ -1,0 +1,51 @@
+name: Import NeoBet football history
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    name: Import historical results into D1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download and prepare CC0 match history
+        run: node scripts/import-football-history.mjs
+
+      - name: Import results into remote D1
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute neobet-intelligence-db --remote --file ${{ runner.temp }}/neobet-football-history.sql
+
+      - name: Verify imported seasons in remote D1
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute neobet-intelligence-db --remote --command "SELECT season, COUNT(*) AS completed_matches FROM historical_match_results WHERE competition_code = 'en.1' GROUP BY season ORDER BY season;"
+
+      - name: Summarize history import
+        if: always()
+        shell: bash
+        env:
+          RESULT_FILE: ${{ runner.temp }}/neobet-football-history-result.json
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RESULT_FILE" ]]; then
+            echo "No history import summary was produced. Check the download step and workflow logs."
+            exit 1
+          fi
+          node --input-type=module -e 'import fs from "node:fs";const r=JSON.parse(fs.readFileSync(process.env.RESULT_FILE,"utf8"));const title=`${r.total_completed_matches} completed ${r.competition} results prepared from ${r.seasons.length} seasons`;console.log(title);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`- ${title}\n\n| Season | Completed matches |\n|---|---:|\n${r.seasons.map(s=>`| ${s.season} | ${s.completed_matches} |`).join("\n")}\n`)'
