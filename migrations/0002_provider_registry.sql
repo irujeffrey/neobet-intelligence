@@ -1,5 +1,3 @@
--- Register the two sources approved for the current no-ad NeoBet use case.
--- Provider access runs in GitHub Actions; credentials remain GitHub secrets.
 INSERT OR IGNORE INTO providers (
   id, name, documentation_url, terms_url, licensing_status,
   public_display_allowed, advertising_supported_allowed, attribution_required,
