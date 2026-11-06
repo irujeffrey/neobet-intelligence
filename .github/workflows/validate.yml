@@ -1,0 +1,55 @@
+name: Validate NeoBet website
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Syntax and website smoke check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check public/src/app.js
+
+      - name: Check the website responds
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e 'const http=require("node:http"),fs=require("node:fs"),path=require("node:path");const root=path.resolve(process.cwd(),"public");const mime={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8"};http.createServer((req,res)=>{let pathname;try{pathname=decodeURIComponent(new URL(req.url,"http://localhost").pathname)}catch{res.writeHead(400).end("Bad request");return}const file=path.resolve(root,pathname==="/"?"index.html":pathname.replace(/^\/+/,""));if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403).end("Forbidden");return}fs.stat(file,(err,stat)=>{if(err||!stat.isFile()){res.writeHead(404).end("Not found");return}res.writeHead(200,{"Content-Type":mime[path.extname(file)]||"application/octet-stream"});fs.createReadStream(file).pipe(res)})}).listen(8000,"127.0.0.1")' > "$RUNNER_TEMP/neobet-preview.log" 2>&1 &
+          server_pid=$!
+          cleanup() { kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          ready=false
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8000/ -o "$RUNNER_TEMP/neobet-home.html"; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/neobet-preview.log"
+            echo "Website did not respond on the GitHub runner."
+            exit 1
+          fi
+
+          grep -q "NeoBet Intelligence" "$RUNNER_TEMP/neobet-home.html"
+          curl --fail --silent http://127.0.0.1:8000/src/styles.css -o /dev/null
+          curl --fail --silent http://127.0.0.1:8000/src/app.js -o /dev/null
+          echo "Homepage and linked CSS/JavaScript assets returned successfully."
