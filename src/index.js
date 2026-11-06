@@ -96,15 +96,20 @@ async function api(request, env, url) {
       return json({ error: "date must be a valid YYYY-MM-DD date" }, 400);
     }
 
-    const now = new Date();
-    const from = matchDate
-      ? `${matchDate}T00:00:00.000Z`
-      : new Date(now.getTime() - 14 * 86400000).toISOString();
+        const now = new Date();
+    const from = now.toISOString();
     const to = matchDate
-      ? new Date(new Date(`${matchDate}T00:00:00.000Z`).getTime() + 86400000).toISOString()
+      ? new Date(
+          new Date(`${matchDate}T00:00:00.000Z`).getTime() + 86400000,
+        ).toISOString()
       : new Date(now.getTime() + 30 * 86400000).toISOString();
-    const conditions = ["f.scheduled_at >= ?", "f.scheduled_at < ?"];
+           const conditions = ["f.scheduled_at >= ?", "f.scheduled_at < ?"];
     const bindings = [from, to];
+
+    if (matchDate) {
+      conditions.push("substr(f.scheduled_at, 1, 10) = ?");
+      bindings.push(matchDate);
+    }
     if (sport) {
       conditions.push("f.sport = ?");
       bindings.push(sport);
