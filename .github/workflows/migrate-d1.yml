@@ -1,4 +1,4 @@
-name: Deploy NeoBet to Cloudflare
+name: Apply NeoBet D1 migrations
 
 on:
   workflow_dispatch:
