@@ -1,0 +1,40 @@
+name: Evaluate NeoBet football competitions
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Import NeoBet football history"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Evaluate league-specific chronological holdouts
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Evaluate each competition from remote D1 history
+        run: node scripts/evaluate-football-competitions.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_D1_DATABASE_ID: efb484b0-ea00-49c8-9955-165b1f003b95
+
+      - name: Save competition evaluation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: neobet-football-competition-evaluation
+          path: ${{ runner.temp }}/neobet-football-competition-evaluation.json
+          if-no-files-found: error
+          retention-days: 30

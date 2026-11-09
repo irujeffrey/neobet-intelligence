@@ -35,7 +35,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 execute neobet-intelligence-db --remote --command "SELECT season, COUNT(*) AS completed_matches FROM historical_match_results WHERE competition_code = 'en.1' GROUP BY season ORDER BY season;"
+          command: d1 execute neobet-intelligence-db --remote --command "SELECT competition_name, competition_code, season, COUNT(*) AS completed_matches FROM historical_match_results GROUP BY competition_code, competition_name, season ORDER BY competition_name, season;"
 
       - name: Summarize history import
         if: always()
@@ -48,4 +48,4 @@ jobs:
             echo "No history import summary was produced. Check the download step and workflow logs."
             exit 1
           fi
-          node --input-type=module -e 'import fs from "node:fs";const r=JSON.parse(fs.readFileSync(process.env.RESULT_FILE,"utf8"));const title=`${r.total_completed_matches} completed ${r.competition} results prepared from ${r.seasons.length} seasons`;console.log(title);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`- ${title}\n\n| Season | Completed matches |\n|---|---:|\n${r.seasons.map(s=>`| ${s.season} | ${s.completed_matches} |`).join("\n")}\n`)'
+          node --input-type=module -e 'import fs from "node:fs";const r=JSON.parse(fs.readFileSync(process.env.RESULT_FILE,"utf8"));const title=`${r.total_completed_matches} completed results prepared across ${r.competitions.length} football competitions`;console.log(title);fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,`- ${title}\n\n| Competition | Code | Season/source | Completed matches | Source found |\n|---|---|---|---:|:---:|\n${r.seasons.map(s=>`| ${s.competition} | ${s.competition_code} | ${s.season} | ${s.completed_matches} | ${s.source_found?"yes":"no"} |`).join("\n")}\n`)'

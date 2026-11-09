@@ -29,6 +29,8 @@ jobs:
           node --check scripts/sync-sports-data.mjs
           node --check scripts/generate-football-shadow-predictions.mjs
           node --check scripts/evaluate-football-shadow-predictions.mjs
+          node --check scripts/evaluate-football-competitions.mjs
+          node --check scripts/import-football-history.mjs
 
       - name: Check the website responds
         shell: bash
