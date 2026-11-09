@@ -18,7 +18,9 @@
    * Probability and confidence stay separate; neither is a guarantee.
    */
   function getCertainty(prediction) {
-    if (!prediction || !Number.isFinite(prediction.probability)) return noBet("Missing probability");
+    if (!prediction || !Number.isFinite(prediction.probability)) {
+      return noBet(prediction?.noBetReason || "Missing probability");
+    }
     const p = prediction.probability;
     if (p < 0 || p > 1) return noBet("Invalid probability");
     if (prediction.calibrated !== true) return noBet("Model is not calibrated");
@@ -225,12 +227,26 @@
         away.textContent = fixture.away_team || "Away team";
         teams.append(home, versus, away);
 
+        const certainty = window.NeoBet.getCertainty({
+          noBetReason: "No calibrated prediction is available for this fixture",
+        });
+        const decision = document.createElement("div");
+        decision.className = "fixture-decision";
+        const badge = document.createElement("span");
+        badge.className = "fixture-no-bet";
+        badge.textContent = certainty.label;
+        badge.setAttribute("aria-label", `${certainty.label}: ${certainty.reason}`);
+        const reason = document.createElement("span");
+        reason.className = "fixture-no-bet-reason";
+        reason.textContent = certainty.reason;
+        decision.append(badge, reason);
+
         const kickoff = document.createElement("time");
         kickoff.className = "fixture-kickoff";
         kickoff.dateTime = fixture.scheduled_at;
         kickoff.textContent = formatter.format(new Date(fixture.scheduled_at));
 
-        card.append(meta, teams, kickoff);
+        card.append(meta, teams, decision, kickoff);
         cards.append(card);
       });
       list.replaceChildren(cards);
