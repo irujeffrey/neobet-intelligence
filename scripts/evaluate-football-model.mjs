@@ -4,6 +4,9 @@ import path from "node:path";
 // All calibration data predates the fresh 2026-27 test season.
 const CALIBRATION_SEASONS = ["2023-24", "2024-25", "2025-26"];
 const FINAL_TEST_SEASON = "2026-27";
+// Freeze the calibrator after reviewing the initial 50-match sample. Future
+// reports score only matches completed from this date onward.
+const FINAL_TEST_START_DATE = "2026-11-10";
 const HOLDOUT_SEASONS = [...CALIBRATION_SEASONS, FINAL_TEST_SEASON];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
@@ -339,8 +342,8 @@ function makeMarkdown(report) {
     "# NeoBet football probability calibration evaluation",
     "",
     `- **Calibration seasons used to fit adjustments:** ${CALIBRATION_SEASONS.join(", ")} (${report.calibration_match_count.toLocaleString()} matches)`,
-    `- **Fresh held-out test season:** ${FINAL_TEST_SEASON} (${report.final_test_match_count.toLocaleString()} completed matches)`,
-    `- **Fresh-season evidence status:** ${report.test_season_status}`,
+    `- **Forward-only test window:** ${FINAL_TEST_SEASON} from ${FINAL_TEST_START_DATE} (${report.final_test_match_count.toLocaleString()} completed matches)`,
+    `- **Forward-test status:** ${report.test_season_status}`,
     `- **Evaluation type:** chronological rolling evaluation; each match uses only results dated before that match. Same-day games are excluded because historical kick-off times are unavailable.`,
     `- **Historical matches available:** ${report.source_match_count.toLocaleString()}`,
     `- **Fitted temperature:** ${report.calibration.temperature.toFixed(4)}`,
@@ -368,7 +371,7 @@ function makeMarkdown(report) {
       lines.push(`| ${outcome.outcome} | ${percent(outcome.ece)} | ${bin.range} | ${bin.count} | ${percent(bin.mean_probability)} | ${percent(bin.observed_frequency)} |`);
     }
   }
-  lines.push("", `This is a scores-only evaluation, not approval to publish live picks. The ${FINAL_TEST_SEASON} season was kept out of calibration fitting. ${report.test_season_status === "PROVISIONAL_PARTIAL_SEASON" ? "Because this season is incomplete, its results are exploratory only; wait for all 380 matches before judging calibration." : "Probabilities still require further review and a separate production-quality gate."}`);
+  lines.push("", `This is a scores-only, forward-only evaluation, not approval to publish live picks. Calibration settings were fit only on seasons through 2025-26 and are held fixed. Only ${FINAL_TEST_SEASON} matches dated ${FINAL_TEST_START_DATE} or later are included in this test window. Treat the results as exploratory while the forward sample is small; assess calibration across a larger sample and probability bins before any production decision.`);
   return `${lines.join("\n")}\n`;
 }
 
@@ -383,9 +386,11 @@ async function main() {
     const count = counts.get(season) || 0;
     if (count !== 380) throw new Error(`Holdout season ${season} has ${count} rows; expected exactly 380 completed Premier League matches. Refusing an incomplete evaluation.`);
   }
-  const finalTestCount = counts.get(FINAL_TEST_SEASON) || 0;
-  if (finalTestCount < 30 || finalTestCount > 380) {
-    throw new Error(`Fresh test season ${FINAL_TEST_SEASON} has ${finalTestCount} completed rows; expected between 30 and 380. Refusing an unusable evaluation.`);
+  const finalTestCount = rows.filter((row) =>
+    row.season === FINAL_TEST_SEASON && row.match_date >= FINAL_TEST_START_DATE,
+  ).length;
+  if (finalTestCount < 30) {
+    throw new Error(`Only ${finalTestCount} completed ${FINAL_TEST_SEASON} matches fall on or after ${FINAL_TEST_START_DATE}; at least 30 are required for an exploratory forward-test report. Import newer completed results and try again later.`);
   }
 
   const holdout = rows.filter((row) => HOLDOUT_SEASONS.includes(row.season));
@@ -399,7 +404,7 @@ async function main() {
       const actual = actualOutcome(match);
       const raw = { probabilities: probabilitiesFor(match, stats), actual };
       if (CALIBRATION_SEASONS.includes(match.season)) calibrationPredictions.push(raw);
-      if (match.season === FINAL_TEST_SEASON) {
+      if (match.season === FINAL_TEST_SEASON && match.match_date >= FINAL_TEST_START_DATE) {
         finalTestRaw.push(raw);
         finalTestBaseline.push({ probabilities: baselineProbabilities(stats), actual });
       }
@@ -429,7 +434,7 @@ async function main() {
     holdout_counts: Object.fromEntries(HOLDOUT_SEASONS.map((season) => [season, counts.get(season)])),
     calibration_match_count: calibrationPredictions.length,
     final_test_match_count: finalTestRaw.length,
-    test_season_status: finalTestRaw.length === 380 ? "COMPLETE_SEASON" : "PROVISIONAL_PARTIAL_SEASON",
+    test_season_status: "FORWARD_ONLY_EXPLORATORY",
     methodology: "Rolling date-based evaluation; only strictly earlier dates are used for each match; two-year exponential half-life; team scoring/conceding rates shrunk toward league averages using eight pseudo-matches.",
     calibration: {
       methods: [
@@ -447,6 +452,7 @@ async function main() {
     },
     final_test: {
       season: FINAL_TEST_SEASON,
+      start_date: FINAL_TEST_START_DATE,
       poisson_raw: summarize(finalTestRaw),
       poisson_scaled: summarize(finalTestScaled),
       poisson_dirichlet: summarize(finalTestDirichlet),
