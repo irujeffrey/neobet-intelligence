@@ -1,0 +1,42 @@
+name: Generate NeoBet football shadow predictions
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shadow-predictions:
+    name: Save unpublished NO BET forecasts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate draft forecasts from remote D1 data
+        run: node scripts/generate-football-shadow-predictions.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_D1_DATABASE_ID: efb484b0-ea00-49c8-9955-165b1f003b95
+
+      - name: Insert unpublished forecasts into remote D1
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute neobet-intelligence-db --remote --file ${{ runner.temp }}/neobet-football-shadow-predictions.sql
+
+      - name: Confirm shadow rows remain drafts
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute neobet-intelligence-db --remote --command "SELECT model_name, model_version, status, decision, calibrated, COUNT(*) AS rows FROM predictions WHERE model_version_id = 'football-poisson-dirichlet-shadow-0-1-0' GROUP BY model_name, model_version, status, decision, calibrated;"
