@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const VALIDATION_SEASONS = ["2022-23", "2023-24"];
-const FINAL_TEST_SEASON = "2024-25";
+const VALIDATION_SEASONS = ["2023-24", "2024-25"];
+const FINAL_TEST_SEASON = "2025-26";
 const HOLDOUT_SEASONS = [...VALIDATION_SEASONS, FINAL_TEST_SEASON];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
