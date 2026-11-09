@@ -290,6 +290,15 @@ async function main() {
     }
     const calibrationSeasons = seasons.slice(-3, -1);
     const testSeason = seasons.at(-1);
+    const selected = [...calibrationSeasons, testSeason];
+    if (selected.some((season, index) => index > 0 && seasonStart(season) - seasonStart(selected[index - 1]) !== 1)) {
+      results.push({
+        code, competition: name, status: "SKIPPED_GAPPED_COMPLETE_SEASONS",
+        complete_seasons: seasons,
+        note: "The latest three complete seasons are not consecutive; refusing a stale-history holdout.",
+      });
+      continue;
+    }
     results.push({
       code, competition: name, status: "EVALUATED", complete_seasons: seasons,
       ...scoreSeason(rows, testSeason, calibrationSeasons),

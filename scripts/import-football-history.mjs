@@ -25,6 +25,14 @@ function stableId(competitionCode, matchDate, homeTeam, awayTeam) {
   return `${PROVIDER_ID}:history:${createHash("sha256").update(key).digest("hex")}`;
 }
 
+function isRegularLeagueMatch(match) {
+  const stage = typeof match.stage === "string" ? match.stage.toLowerCase() : "";
+  const round = typeof match.round === "string" ? match.round.toLowerCase() : "";
+  if (stage && !stage.includes("regular")) return false;
+  if (/play[ -]?offs?|finals?|semi[ -]?finals?|quarter[ -]?finals?/.test(round)) return false;
+  return true;
+}
+
 function seasonKeys(competition) {
   return Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, index) => FIRST_YEAR + index)
     .map((year) => competition.calendarYear ? String(year) : `${year}-${String(year + 1).slice(-2)}`);
@@ -52,6 +60,7 @@ async function fetchSeason(competition, season) {
 async function main() {
   const rows = [];
   const seasonCounts = [];
+  const excludedIds = new Set();
   const todayUtc = new Date().toISOString().slice(0, 10);
   for (const competition of COMPETITIONS) {
     for (const season of seasonKeys(competition)) {
@@ -67,6 +76,12 @@ async function main() {
           const awayTeam = typeof match.team2 === "string" ? match.team2.trim() : "";
           if (!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) continue;
           if (matchDate >= todayUtc) continue;
+          // Remove play-off rows from earlier imports so completed league
+          // seasons can be checked as regular double round-robin schedules.
+          if (!isRegularLeagueMatch(match)) {
+            if (homeTeam && awayTeam) excludedIds.add(stableId(competition.code, matchDate, homeTeam, awayTeam));
+            continue;
+          }
           if (!Array.isArray(score) || score.length !== 2 || !score.every(Number.isInteger)) continue;
           if (score[0] < 0 || score[1] < 0 || !homeTeam || !awayTeam || homeTeam === awayTeam) continue;
           rows.push({
@@ -98,6 +113,11 @@ async function main() {
     "match_date", "home_team", "away_team", "home_goals", "away_goals", "source_url",
   ];
   const statements = [];
+  const idsToDelete = [...excludedIds];
+  for (let offset = 0; offset < idsToDelete.length; offset += 200) {
+    const batch = idsToDelete.slice(offset, offset + 200).map(sql).join(",");
+    statements.push(`DELETE FROM historical_match_results WHERE provider_id = '${PROVIDER_ID}' AND id IN (${batch});`);
+  }
   for (let offset = 0; offset < rows.length; offset += 25) {
     const batch = rows.slice(offset, offset + 25);
     const values = batch.map((row) => `(${columns.map((column) => sql(row[column])).join(",")})`).join(",\n");
@@ -115,7 +135,8 @@ async function main() {
   const resultPath = path.join(runnerTemp, "neobet-football-history-result.json");
   fs.writeFileSync(sqlPath, `${statements.join("\n\n")}\n`, { encoding: "utf8", mode: 0o600 });
   fs.writeFileSync(resultPath, JSON.stringify({
-    provider: PROVIDER_ID, competitions: COMPETITIONS, total_completed_matches: rows.length, seasons: seasonCounts,
+    provider: PROVIDER_ID, competitions: COMPETITIONS, total_completed_matches: rows.length,
+    excluded_non_regular_matches: excludedIds.size, seasons: seasonCounts,
   }), { encoding: "utf8", mode: 0o600 });
   console.log(`Prepared ${rows.length} completed football results across ${COMPETITIONS.length} competitions and ${seasonCounts.length} season sources.`);
 }
