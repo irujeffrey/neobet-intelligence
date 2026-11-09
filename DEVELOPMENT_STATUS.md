@@ -7,8 +7,8 @@
 - D1 database and initial schema. The user confirmed `/api/health` reports `database: connected` and `schema: ready`.
 - Read-only Worker APIs for health, fixtures, sync status, and published predictions.
 - Football fixture cards open a match-analysis view and show grey NO BET while no calibrated public prediction exists.
-- GitHub workflow prepared to generate football shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
-- GitHub workflow prepared to score finished shadow forecasts with accuracy, Brier score, log loss, and calibration bins.
+- Daily successful sports-data sync triggers a GitHub workflow that generates football shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
+- Shadow generation triggers a GitHub review workflow that scores finished forecasts with accuracy, Brier score, log loss, and calibration bins.
 - Provider sync prepared for football-data.org football fixtures/results and API Ninjas NBA/WNBA schedules/results.
 - Provider credentials are read only by the GitHub Actions sync job and are never put in the browser or Worker.
 
