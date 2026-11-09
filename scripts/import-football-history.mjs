@@ -44,15 +44,19 @@ async function fetchSeason(season) {
 async function main() {
   const rows = [];
   const seasonCounts = [];
+  const todayUtc = new Date().toISOString().slice(0, 10);
   for (const season of SEASONS) {
     const { sourceUrl, matches } = await fetchSeason(season);
     let completed = 0;
     for (const match of matches) {
       const matchDate = typeof match.date === "string" ? match.date.slice(0, 10) : "";
-      const score = match.score?.ft;
+      // OpenFootball uses a bare two-score array for some full-time results,
+      // including confirmed 0-0 matches; other results use score.ft.
+      const score = Array.isArray(match.score) ? match.score : match.score?.ft;
       const homeTeam = typeof match.team1 === "string" ? match.team1.trim() : "";
       const awayTeam = typeof match.team2 === "string" ? match.team2.trim() : "";
       if (!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) continue;
+      if (matchDate >= todayUtc) continue;
       if (!Array.isArray(score) || score.length !== 2 || !score.every(Number.isInteger)) continue;
       if (score[0] < 0 || score[1] < 0 || !homeTeam || !awayTeam || homeTeam === awayTeam) continue;
       rows.push({
