@@ -8,6 +8,7 @@
 - Read-only Worker APIs for health, fixtures, sync status, and published predictions.
 - Football fixture cards open a match-analysis view and show grey NO BET while no calibrated public prediction exists.
 - GitHub workflow prepared to generate football shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
+- GitHub workflow prepared to score finished shadow forecasts with accuracy, Brier score, log loss, and calibration bins.
 - Provider sync prepared for football-data.org football fixtures/results and API Ninjas NBA/WNBA schedules/results.
 - Provider credentials are read only by the GitHub Actions sync job and are never put in the browser or Worker.
 
@@ -21,7 +22,7 @@
 ## Still to build
 
 - Public calibrated prediction generation, settlement ingestion, and performance dashboards.
-- Shadow forecast settlement and prospective calibration reporting still need to be built before considering public picks.
+- Public calibrated prediction generation and performance dashboards still need to be built before considering public picks.
 - Confirm each provider account's current quota before increasing the competitions or sync frequency.
 
 All validation and provider sync runs are intended to run on GitHub-hosted runners. No local testing is required.
