@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const HOLDOUT_SEASONS = ["2022-23", "2023-24", "2024-25"];
+const VALIDATION_SEASONS = ["2022-23", "2023-24"];
+const FINAL_TEST_SEASON = "2024-25";
+const HOLDOUT_SEASONS = [...VALIDATION_SEASONS, FINAL_TEST_SEASON];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
 const SHRINKAGE_MATCHES = 8;
@@ -200,35 +202,83 @@ function summarize(predictions) {
   };
 }
 
+function applyTemperature(probabilities, temperature) {
+  const logits = probabilities.map((probability) => Math.log(Math.max(1e-15, probability)) / temperature);
+  const maxLogit = Math.max(...logits);
+  const exponentials = logits.map((value) => Math.exp(value - maxLogit));
+  const total = exponentials.reduce((sum, value) => sum + value, 0);
+  return exponentials.map((value) => value / total);
+}
+
+function validationLogLoss(predictions, temperature) {
+  return predictions.reduce((total, prediction) => {
+    const adjusted = applyTemperature(prediction.probabilities, temperature);
+    return total - Math.log(Math.max(1e-15, adjusted[prediction.actual]));
+  }, 0) / predictions.length;
+}
+
+function fitTemperature(predictions) {
+  if (!predictions.length) throw new Error("No validation predictions are available for calibration.");
+  // Golden-section search minimizes multiclass validation log loss without extra packages.
+  let left = 0.2;
+  let right = 5;
+  const ratio = (Math.sqrt(5) - 1) / 2;
+  let x1 = right - ratio * (right - left);
+  let x2 = left + ratio * (right - left);
+  let y1 = validationLogLoss(predictions, x1);
+  let y2 = validationLogLoss(predictions, x2);
+  for (let iteration = 0; iteration < 100; iteration += 1) {
+    if (y1 <= y2) {
+      right = x2;
+      x2 = x1;
+      y2 = y1;
+      x1 = right - ratio * (right - left);
+      y1 = validationLogLoss(predictions, x1);
+    } else {
+      left = x1;
+      x1 = x2;
+      y1 = y2;
+      x2 = left + ratio * (right - left);
+      y2 = validationLogLoss(predictions, x2);
+    }
+  }
+  return (left + right) / 2;
+}
+
 function percent(value) { return `${(value * 100).toFixed(2)}%`; }
 
 function makeMarkdown(report) {
   const lines = [
-    "# NeoBet football model evaluation",
+    "# NeoBet football probability calibration evaluation",
     "",
-    `- **Evaluation type:** chronological rolling holdout; predictions use only matches dated before each test date. Same-day games are excluded from the information set because historical kick-off times are not available.`,
-    `- **Holdout seasons:** ${HOLDOUT_SEASONS.join(", ")}`,
+    `- **Validation seasons used to fit temperature:** ${VALIDATION_SEASONS.join(", ")} (${report.validation_match_count.toLocaleString()} matches)`,
+    `- **Final untouched test season:** ${FINAL_TEST_SEASON} (${report.final_test_match_count.toLocaleString()} matches)`,
+    `- **Evaluation type:** chronological rolling evaluation; each match uses only results dated before that match. Same-day games are excluded because historical kick-off times are unavailable.`,
     `- **Historical matches available:** ${report.source_match_count.toLocaleString()}`,
-    `- **Held-out matches evaluated:** ${report.evaluated_match_count.toLocaleString()}`,
-    `- **Model status:** evaluation only; probabilities are not published or claimed to be calibrated.`,
+    `- **Fitted temperature:** ${report.calibration.temperature.toFixed(4)} (fit only on validation seasons)`,
+    `- **Validation log loss before / after scaling:** ${report.calibration.validation_log_loss_raw.toFixed(4)} / ${report.calibration.validation_log_loss_scaled.toFixed(4)}`,
+    `- **Model status:** evaluation only; no probabilities are published or claimed production-calibrated.`,
     `- **Limitations:** scores-only Premier League history; no odds, line-ups, injuries, or match-time information.`,
+    "",
+    `## Final test results: ${FINAL_TEST_SEASON}`,
     "",
     "| Method | Accuracy | Multiclass Brier (lower is better) | Log loss (lower is better) | Mean one-vs-rest ECE (lower is better) |",
     "|---|---:|---:|---:|---:|",
-    `| Rolling goal-rate Poisson baseline | ${percent(report.poisson.accuracy)} | ${report.poisson.multiclass_brier_score.toFixed(4)} | ${report.poisson.log_loss.toFixed(4)} | ${percent(report.poisson.calibration.mean_ece)} |`,
-    `| Expanding historical outcome-rate baseline | ${percent(report.outcome_baseline.accuracy)} | ${report.outcome_baseline.multiclass_brier_score.toFixed(4)} | ${report.outcome_baseline.log_loss.toFixed(4)} | ${percent(report.outcome_baseline.calibration.mean_ece)} |`,
+    `| Raw rolling goal-rate Poisson | ${percent(report.final_test.poisson_raw.accuracy)} | ${report.final_test.poisson_raw.multiclass_brier_score.toFixed(4)} | ${report.final_test.poisson_raw.log_loss.toFixed(4)} | ${percent(report.final_test.poisson_raw.calibration.mean_ece)} |`,
+    `| Temperature-scaled Poisson | ${percent(report.final_test.poisson_scaled.accuracy)} | ${report.final_test.poisson_scaled.multiclass_brier_score.toFixed(4)} | ${report.final_test.poisson_scaled.log_loss.toFixed(4)} | ${percent(report.final_test.poisson_scaled.calibration.mean_ece)} |`,
+    `| Expanding outcome-rate baseline | ${percent(report.final_test.outcome_baseline.accuracy)} | ${report.final_test.outcome_baseline.multiclass_brier_score.toFixed(4)} | ${report.final_test.outcome_baseline.log_loss.toFixed(4)} | ${percent(report.final_test.outcome_baseline.calibration.mean_ece)} |`,
     "",
-    "## Per-outcome calibration: Poisson baseline",
+    `## Per-outcome calibration: temperature-scaled Poisson on ${FINAL_TEST_SEASON}`,
     "",
     "| Outcome | ECE | Probability bin | Matches | Mean predicted | Observed frequency |",
     "|---|---:|---:|---:|---:|---:|",
   ];
-  for (const outcome of report.poisson.calibration.by_outcome) {
+  for (const outcome of report.final_test.poisson_scaled.calibration.by_outcome) {
     for (const bin of outcome.bins.filter((entry) => entry.count > 0)) {
       lines.push(`| ${outcome.outcome} | ${percent(outcome.ece)} | ${bin.range} | ${bin.count} | ${percent(bin.mean_probability)} | ${percent(bin.observed_frequency)} |`);
     }
   }
-  lines.push("", "These evaluation results alone do not authorize live picks. Calibration must be assessed and, if needed, fitted on a separate validation period before probabilities are published.");
+  lines.push("", "This is a scores-only evaluation, not approval to publish live picks. The 2024–25 season was kept out of temperature fitting; probabilities still require further review and a separate production-quality gate.");
   return `${lines.join("\n")}\n`;
 }
 
@@ -246,15 +296,29 @@ async function main() {
 
   const holdout = rows.filter((row) => HOLDOUT_SEASONS.includes(row.season));
   const testDates = [...new Set(holdout.map((row) => row.match_date))].sort();
-  const predictions = { poisson: [], outcome_baseline: [] };
+  const validationPredictions = [];
+  const finalTestRaw = [];
+  const finalTestBaseline = [];
   for (const date of testDates) {
     const stats = weightedStats(rows, date);
     for (const match of holdout.filter((row) => row.match_date === date)) {
       const actual = actualOutcome(match);
-      predictions.poisson.push({ probabilities: probabilitiesFor(match, stats), actual });
-      predictions.outcome_baseline.push({ probabilities: baselineProbabilities(stats), actual });
+      const raw = { probabilities: probabilitiesFor(match, stats), actual };
+      if (VALIDATION_SEASONS.includes(match.season)) validationPredictions.push(raw);
+      if (match.season === FINAL_TEST_SEASON) {
+        finalTestRaw.push(raw);
+        finalTestBaseline.push({ probabilities: baselineProbabilities(stats), actual });
+      }
     }
   }
+
+  const temperature = fitTemperature(validationPredictions);
+  const scaledValidation = validationPredictions.map((prediction) => ({
+    ...prediction, probabilities: applyTemperature(prediction.probabilities, temperature),
+  }));
+  const finalTestScaled = finalTestRaw.map((prediction) => ({
+    ...prediction, probabilities: applyTemperature(prediction.probabilities, temperature),
+  }));
 
   const report = {
     generated_at: new Date().toISOString(),
@@ -262,11 +326,23 @@ async function main() {
     source_match_count: rows.length,
     holdout_seasons: HOLDOUT_SEASONS,
     holdout_counts: Object.fromEntries(HOLDOUT_SEASONS.map((season) => [season, counts.get(season)])),
-    evaluated_match_count: holdout.length,
+    validation_match_count: validationPredictions.length,
+    final_test_match_count: finalTestRaw.length,
     methodology: "Rolling date-based evaluation; only strictly earlier dates are used for each match; two-year exponential half-life; team scoring/conceding rates shrunk toward league averages using eight pseudo-matches.",
-    poisson: summarize(predictions.poisson),
-    outcome_baseline: summarize(predictions.outcome_baseline),
-    publication_status: "evaluation_only_not_calibrated_for_publication",
+    calibration: {
+      method: "multiclass temperature scaling fitted by minimizing validation log loss",
+      validation_seasons: VALIDATION_SEASONS,
+      temperature,
+      validation_log_loss_raw: summarize(validationPredictions).log_loss,
+      validation_log_loss_scaled: summarize(scaledValidation).log_loss,
+    },
+    final_test: {
+      season: FINAL_TEST_SEASON,
+      poisson_raw: summarize(finalTestRaw),
+      poisson_scaled: summarize(finalTestScaled),
+      outcome_baseline: summarize(finalTestBaseline),
+    },
+    publication_status: "evaluation_only_not_approved_for_publication",
   };
 
   const outputDir = process.env.RUNNER_TEMP || process.cwd();
