@@ -8,8 +8,8 @@ const API_TOKEN = requireEnv("CLOUDFLARE_API_TOKEN");
 const MODEL_NAME = "rolling-goal-rate-poisson-dirichlet-shadow";
 const MODEL_VERSION = "0.1.0";
 const COMPETITIONS = [
-  { code: "en.1", name: "Premier League", modelVersionId: "football-poisson-dirichlet-shadow-0-1-0" },
-  { code: "pt.1", name: "Primeira Liga", modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
+  { code: "en.1", name: "Premier League", modelName: MODEL_NAME, modelVersionId: "football-poisson-dirichlet-shadow-0-1-0" },
+  { code: "pt.1", name: "Primeira Liga", modelName: \${MODEL_NAME}-pt-1`, modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
 ];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
@@ -266,7 +266,7 @@ function insertPrediction(row) {
     ${sql(row.selection)}, 'no_bet', ${row.probability.toFixed(10)}, 0, NULL, NULL,
     ${sql(row.data_quality)}, NULL, 0, NULL,
     'Shadow estimate only; model calibration is not approved for publication.',
-    ${sql(row.explanation)}, ${sql(MODEL_NAME)}, ${sql(MODEL_VERSION)}, 'draft', NULL
+     ${sql(row.explanation)}, ${sql(row.model_name)}, ${sql(MODEL_VERSION)}, 'draft', NULL
   );`;
 }
 
@@ -322,8 +322,9 @@ async function main() {
       id, sport, model_name, version, calibration_method, calibration_status,
       training_data_start, training_data_end
     ) VALUES (
-      ${sql(profile.modelVersionId)}, 'football', ${sql(MODEL_NAME)}, ${sql(MODEL_VERSION)},
+        ${sql(profile.modelVersionId)}, 'football', ${sql(profile.modelName)}, ${sql(MODEL_VERSION)},
       ${sql(`L2-regularized Dirichlet; shadow-only; ${profile.code}`)}, 'unverified',
+
       ${sql(profile.trainingDataStart)}, ${sql(profile.trainingDataEnd)}
     );`);
   let preparedPredictions = 0;
@@ -342,7 +343,7 @@ async function main() {
     for (let index = 0; index < OUTCOMES.length; index += 1) {
       sqlStatements.push(insertPrediction({
         fixture_id: fixture.fixture_id,
-        model_version_id: profile.modelVersionId,
+         model_name: profile.modelName,
         selection: OUTCOMES[index],
         probability: probabilities[index],
         data_quality: bothTeamsKnown ? dataQuality : "fair",
