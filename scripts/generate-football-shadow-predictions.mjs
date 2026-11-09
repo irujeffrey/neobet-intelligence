@@ -7,8 +7,10 @@ const DATABASE_ID = requireEnv("CLOUDFLARE_D1_DATABASE_ID");
 const API_TOKEN = requireEnv("CLOUDFLARE_API_TOKEN");
 const MODEL_NAME = "rolling-goal-rate-poisson-dirichlet-shadow";
 const MODEL_VERSION = "0.1.0";
-const MODEL_VERSION_ID = "football-poisson-dirichlet-shadow-0-1-0";
-const CALIBRATION_SEASONS = ["2023-24", "2024-25", "2025-26"];
+const COMPETITIONS = [
+  { code: "en.1", name: "Premier League", modelVersionId: "football-poisson-dirichlet-shadow-0-1-0" },
+  { code: "pt.1", name: "Primeira Liga", modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
+];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
 const SHRINKAGE_MATCHES = 8;
@@ -29,6 +31,28 @@ function sql(value) {
 
 function stableId(...parts) {
   return createHash("sha256").update(parts.join("|").toLowerCase()).digest("hex");
+}
+
+function seasonStart(season) { return Number(String(season).slice(0, 4)); }
+
+function completedSeasons(rows) {
+  const seasons = new Map();
+  for (const row of rows) {
+    if (!seasons.has(row.season)) seasons.set(row.season, []);
+    seasons.get(row.season).push(row);
+  }
+  return [...seasons.entries()].filter(([, matches]) => {
+    const homeCounts = new Map();
+    const awayCounts = new Map();
+    for (const match of matches) {
+      homeCounts.set(match.home_team, (homeCounts.get(match.home_team) || 0) + 1);
+      awayCounts.set(match.away_team, (awayCounts.get(match.away_team) || 0) + 1);
+    }
+    const teams = new Set([...homeCounts.keys(), ...awayCounts.keys()]);
+    const teamCount = teams.size;
+    return teamCount >= 10 && matches.length === teamCount * (teamCount - 1) &&
+      [...teams].every((team) => homeCounts.get(team) === teamCount - 1 && awayCounts.get(team) === teamCount - 1);
+  }).map(([season]) => season).sort((a, b) => seasonStart(a) - seasonStart(b));
 }
 
 async function queryD1(statement) {
@@ -231,14 +255,14 @@ function mainOutcome(match) {
 }
 
 function insertPrediction(row) {
-  const id = stableId(row.fixture_id, MODEL_VERSION_ID, row.selection);
+  const id = stableId(row.fixture_id, row.model_version_id, row.selection);
   return `INSERT OR IGNORE INTO predictions (
     id, fixture_id, model_version_id, sport, market, selection, decision, probability,
     calibrated, model_confidence, model_uncertainty, data_quality, value_estimate,
     odds_required, odds_snapshot_id, no_bet_reason, explanation, model_name,
     model_version, status, published_at
   ) VALUES (
-    ${sql(id)}, ${sql(row.fixture_id)}, ${sql(MODEL_VERSION_ID)}, 'football', '1X2',
+    ${sql(id)}, ${sql(row.fixture_id)}, ${sql(row.model_version_id)}, 'football', '1X2',
     ${sql(row.selection)}, 'no_bet', ${row.probability.toFixed(10)}, 0, NULL, NULL,
     ${sql(row.data_quality)}, NULL, 0, NULL,
     'Shadow estimate only; model calibration is not approved for publication.',
@@ -248,31 +272,34 @@ function insertPrediction(row) {
 
 async function main() {
   const history = await queryD1(`
-    SELECT season, match_date, home_team, away_team, home_goals, away_goals
+    SELECT competition_code, season, match_date, home_team, away_team, home_goals, away_goals
     FROM historical_match_results
-    WHERE provider_id = 'openfootball' AND competition_code = 'en.1'
-    ORDER BY match_date ASC, season ASC
+    WHERE provider_id = 'openfootball' AND competition_code IN (${COMPETITIONS.map(({ code }) => sql(code)).join(",")})
+    ORDER BY competition_code, match_date ASC, season ASC
   `);
   const validHistory = history.filter((row) =>
     typeof row.season === "string" && typeof row.match_date === "string" &&
     typeof row.home_team === "string" && typeof row.away_team === "string" &&
     Number.isInteger(row.home_goals) && Number.isInteger(row.away_goals),
   );
-  const seasonCounts = new Map();
-  for (const row of validHistory) seasonCounts.set(row.season, (seasonCounts.get(row.season) || 0) + 1);
-  for (const season of CALIBRATION_SEASONS) {
-    if (seasonCounts.get(season) !== 380) {
-      throw new Error(`${season} has ${seasonCounts.get(season) || 0} results; expected 380 before fitting shadow calibration.`);
+  const profiles = COMPETITIONS.map((competition) => {
+    const rows = validHistory.filter((row) => row.competition_code === competition.code);
+    const seasons = completedSeasons(rows);
+    const calibrationSeasons = seasons.slice(-3);
+    if (calibrationSeasons.length !== 3 || calibrationSeasons.some((season, index) =>
+      index > 0 && seasonStart(season) - seasonStart(calibrationSeasons[index - 1]) !== 1)) {
+      throw new Error(`${competition.name} needs three consecutive complete historical seasons for shadow-only calibration; found ${seasons.join(", ") || "none"}.`);
     }
-  }
-
-  const calibrationPredictions = [];
-  const calibrationRows = validHistory.filter((row) => CALIBRATION_SEASONS.includes(row.season));
-  for (const match of calibrationRows) {
-    const stats = weightedStats(validHistory, match.match_date);
-    calibrationPredictions.push({ probabilities: rawProbabilities(match, stats), actual: mainOutcome(match) });
-  }
-  const dirichlet = fitDirichlet(calibrationPredictions);
+    const calibrationRows = rows.filter((row) => calibrationSeasons.includes(row.season));
+    const calibrationPredictions = calibrationRows.map((match) => ({
+      probabilities: rawProbabilities(match, weightedStats(rows, match.match_date)),
+      actual: mainOutcome(match),
+    }));
+    return { ...competition, rows, seasons: calibrationSeasons, calibrationPredictions,
+      trainingDataStart: calibrationRows.map((row) => row.match_date).sort()[0],
+      trainingDataEnd: calibrationRows.map((row) => row.match_date).sort().at(-1),
+      dirichlet: fitDirichlet(calibrationPredictions) };
+  });
 
   const now = new Date();
   const start = now.toISOString();
@@ -285,27 +312,28 @@ async function main() {
     JOIN teams AS away ON away.id = f.away_team_id
     LEFT JOIN competitions AS competition ON competition.id = f.competition_id
     WHERE f.sport = 'football' AND f.status = 'scheduled'
-      AND competition.name = 'Premier League'
+      AND competition.name IN (${COMPETITIONS.map(({ name }) => sql(name)).join(",")})
       AND f.scheduled_at >= ${sql(start)} AND f.scheduled_at < ${sql(end)}
     ORDER BY f.scheduled_at ASC
     LIMIT 100
   `);
 
-  const sqlStatements = [
-    `INSERT OR IGNORE INTO model_versions (
+  const sqlStatements = profiles.map((profile) => `INSERT OR IGNORE INTO model_versions (
       id, sport, model_name, version, calibration_method, calibration_status,
       training_data_start, training_data_end
     ) VALUES (
-      ${sql(MODEL_VERSION_ID)}, 'football', ${sql(MODEL_NAME)}, ${sql(MODEL_VERSION)},
-      'L2-regularized Dirichlet; shadow-only', 'unverified', '2010-08-14', '2026-05-24'
-    );`,
-  ];
+      ${sql(profile.modelVersionId)}, 'football', ${sql(MODEL_NAME)}, ${sql(MODEL_VERSION)},
+      ${sql(`L2-regularized Dirichlet; shadow-only; ${profile.code}`)}, 'unverified',
+      ${sql(profile.trainingDataStart)}, ${sql(profile.trainingDataEnd)}
+    );`);
   let preparedPredictions = 0;
   for (const fixture of fixtures) {
+    const profile = profiles.find((entry) => entry.name === fixture.competition);
+    if (!profile) continue;
     const targetDate = String(fixture.scheduled_at).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) continue;
-    const stats = weightedStats(validHistory, targetDate);
-    const probabilities = applyDirichlet(rawProbabilities(fixture, stats), dirichlet.weights, dirichlet.bias);
+    const stats = weightedStats(profile.rows, targetDate);
+    const probabilities = applyDirichlet(rawProbabilities(fixture, stats), profile.dirichlet.weights, profile.dirichlet.bias);
     const bothTeamsKnown = stats?.teams.has(canonicalTeam(fixture.home_team)) &&
       stats?.teams.has(canonicalTeam(fixture.away_team));
     const dataQuality = ["good", "fair", "poor", "unavailable"].includes(fixture.data_quality)
@@ -314,6 +342,7 @@ async function main() {
     for (let index = 0; index < OUTCOMES.length; index += 1) {
       sqlStatements.push(insertPrediction({
         fixture_id: fixture.fixture_id,
+        model_version_id: profile.modelVersionId,
         selection: OUTCOMES[index],
         probability: probabilities[index],
         data_quality: bothTeamsKnown ? dataQuality : "fair",
@@ -331,9 +360,14 @@ async function main() {
     model_version: MODEL_VERSION,
     model_status: "unverified_shadow_only",
     calibration_method: "L2-regularized Dirichlet on rolling Poisson 1X2 probabilities",
-    calibration_seasons: CALIBRATION_SEASONS,
-    calibration_matches: calibrationPredictions.length,
-    upcoming_premier_league_fixtures: fixtures.length,
+    competitions: profiles.map((profile) => ({
+      competition: profile.name,
+      competition_code: profile.code,
+      model_version_id: profile.modelVersionId,
+      calibration_seasons: profile.seasons,
+      calibration_matches: profile.calibrationPredictions.length,
+      upcoming_fixtures: fixtures.filter((fixture) => fixture.competition === profile.name).length,
+    })),
     draft_no_bet_prediction_rows_prepared: preparedPredictions,
     note: "Predictions are draft, decision=no_bet, calibrated=0, and are not returned by the public predictions API.",
   };
@@ -344,8 +378,7 @@ async function main() {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
       `# Football shadow forecast run\n\n` +
       `- Model: ${MODEL_NAME} v${MODEL_VERSION} (${summary.model_status})\n` +
-      `- Historical calibration rows: ${calibrationPredictions.length}\n` +
-      `- Upcoming Premier League fixtures: ${fixtures.length}\n` +
+      profiles.map((profile) => `- ${profile.name}: ${profile.calibrationPredictions.length} calibration matches from ${profile.seasons.join(", ")}; ${fixtures.filter((fixture) => fixture.competition === profile.name).length} upcoming fixtures`).join("\n") + "\n" +
       `- Draft NO BET outcome rows prepared: ${preparedPredictions}\n\n` +
       `These records remain unpublished; no probabilities are presented as production-calibrated.\n`,
     );

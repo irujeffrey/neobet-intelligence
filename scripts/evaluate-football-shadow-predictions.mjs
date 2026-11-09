@@ -4,7 +4,10 @@ import path from "node:path";
 const ACCOUNT_ID = requireEnv("CLOUDFLARE_ACCOUNT_ID");
 const DATABASE_ID = requireEnv("CLOUDFLARE_D1_DATABASE_ID");
 const API_TOKEN = requireEnv("CLOUDFLARE_API_TOKEN");
-const MODEL_VERSION_ID = "football-poisson-dirichlet-shadow-0-1-0";
+const MODEL_VERSION_IDS = [
+  "football-poisson-dirichlet-shadow-0-1-0",
+  "football-poisson-dirichlet-shadow-pt-1-0-1-0",
+];
 const OUTCOMES = ["home", "draw", "away"];
 
 function requireEnv(name) {
@@ -19,7 +22,7 @@ async function loadRows() {
     method: "POST",
     headers: { authorization: `Bearer ${API_TOKEN}`, "content-type": "application/json" },
     body: JSON.stringify({
-      sql: `SELECT p.fixture_id, p.market, p.selection, p.probability, p.created_at,
+      sql: `SELECT p.fixture_id, p.model_version_id, p.market, p.selection, p.probability, p.created_at,
           f.scheduled_at, f.status, f.home_score, f.away_score, home.name AS home_team,
           away.name AS away_team, competition.name AS competition
         FROM predictions AS p
@@ -27,7 +30,7 @@ async function loadRows() {
         JOIN teams AS home ON home.id = f.home_team_id
         JOIN teams AS away ON away.id = f.away_team_id
         LEFT JOIN competitions AS competition ON competition.id = f.competition_id
-        WHERE p.model_version_id = '${MODEL_VERSION_ID}'
+        WHERE p.model_version_id IN (${MODEL_VERSION_IDS.map((id) => `'${id}'`).join(",")})
           AND p.status = 'draft' AND p.decision = 'no_bet' AND p.calibrated = 0
           AND p.market = '1X2' AND f.sport = 'football'
         ORDER BY f.scheduled_at ASC, p.selection ASC`,
@@ -107,7 +110,7 @@ function markdown(report) {
   const lines = [
     "# NeoBet football shadow forecast review",
     "",
-    `- **Model:** ${MODEL_VERSION_ID} (unverified, shadow only)`,
+    `- **Models:** ${MODEL_VERSION_IDS.join(", ")} (unverified, shadow only)`,
     `- **Draft forecast rows read:** ${report.draft_rows_read.toLocaleString()}`,
     `- **Complete, pre-kickoff forecast triples settled:** ${report.scored.matches.toLocaleString()}`,
     `- **Status:** ${report.status}`,
@@ -116,14 +119,19 @@ function markdown(report) {
     "",
     "| Sample | Accuracy | Multiclass Brier (lower is better) | Log loss (lower is better) | Mean one-vs-rest ECE (lower is better) |",
     "|---:|---:|---:|---:|---:|",
-    `| ${report.scored.matches} | ${pct(report.scored.accuracy)} | ${metric(report.scored.multiclass_brier_score)} | ${metric(report.scored.log_loss)} | ${pct(report.scored.mean_one_vs_rest_ece)} |`,
   ];
+  for (const [modelId, result] of Object.entries(report.by_model)) {
+    lines.push(`| ${modelId} (${result.scored.matches} matches) | ${pct(result.scored.accuracy)} | ${metric(result.scored.multiclass_brier_score)} | ${metric(result.scored.log_loss)} | ${pct(result.scored.mean_one_vs_rest_ece)} |`);
+  }
   if (report.scored.matches) {
-    lines.push("", "## Calibration by outcome", "", "| Outcome | ECE | Bin | Matches | Mean predicted | Observed frequency |", "|---|---:|---:|---:|---:|---:|");
-    for (const outcome of OUTCOMES) {
-      const result = report.scored.calibration_by_outcome[outcome];
-      for (const bin of result.bins) {
-        lines.push(`| ${outcome} | ${pct(result.ece)} | ${bin.range} | ${bin.matches} | ${pct(bin.mean_probability)} | ${pct(bin.observed_frequency)} |`);
+    for (const [modelId, model] of Object.entries(report.by_model)) {
+      if (!model.scored.matches) continue;
+      lines.push("", `## Calibration by outcome: ${modelId}`, "", "| Outcome | ECE | Bin | Matches | Mean predicted | Observed frequency |", "|---|---:|---:|---:|---:|---:|");
+      for (const outcome of OUTCOMES) {
+        const result = model.scored.calibration_by_outcome[outcome];
+        for (const bin of result.bins) {
+          lines.push(`| ${outcome} | ${pct(result.ece)} | ${bin.range} | ${bin.matches} | ${pct(bin.mean_probability)} | ${pct(bin.observed_frequency)} |`);
+        }
       }
     }
   } else {
@@ -143,8 +151,9 @@ async function main() {
     if (row.status !== "finished" || !Number.isInteger(row.home_score) || !Number.isInteger(row.away_score)) continue;
     if (Date.parse(row.created_at) >= Date.parse(row.scheduled_at)) continue;
     if (typeof row.probability !== "number" || row.probability < 0 || row.probability > 1) continue;
-    if (!grouped.has(row.fixture_id)) grouped.set(row.fixture_id, { rows: [], actual: actualOutcome(row.home_score, row.away_score), home_team: row.home_team, away_team: row.away_team, competition: row.competition, scheduled_at: row.scheduled_at });
-    grouped.get(row.fixture_id).rows.push(row);
+    const key = `${row.model_version_id}|${row.fixture_id}`;
+    if (!grouped.has(key)) grouped.set(key, { rows: [], model_version_id: row.model_version_id, actual: actualOutcome(row.home_score, row.away_score), home_team: row.home_team, away_team: row.away_team, competition: row.competition, scheduled_at: row.scheduled_at });
+    grouped.get(key).rows.push(row);
   }
 
   const matches = [];
@@ -154,15 +163,23 @@ async function main() {
     if (OUTCOMES.some((outcome) => !Number.isFinite(probabilities[outcome])) || group.rows.length !== 3) continue;
     const total = OUTCOMES.reduce((sum, outcome) => sum + probabilities[outcome], 0);
     if (Math.abs(total - 1) > 0.002) continue;
-    matches.push({ fixture_id: fixtureId, ...group, probabilities });
+    matches.push({ fixture_id: group.rows[0].fixture_id, ...group, probabilities });
   }
 
   const scored = score(matches);
   const report = {
     generated_at: new Date().toISOString(),
-    model_version_id: MODEL_VERSION_ID,
+    model_version_ids: MODEL_VERSION_IDS,
     draft_rows_read: rows.length,
     scored,
+    by_model: Object.fromEntries(MODEL_VERSION_IDS.map((modelVersionId) => {
+      const modelMatches = matches.filter((match) => match.model_version_id === modelVersionId);
+      return [modelVersionId, { scored: score(modelMatches), matches: modelMatches.map((match) => ({
+        fixture_id: match.fixture_id, competition: match.competition, home_team: match.home_team,
+        away_team: match.away_team, scheduled_at: match.scheduled_at, actual: match.actual,
+        probabilities: match.probabilities,
+      })) }];
+    })),
     status: matches.length < 100 ? "PROVISIONAL_SHADOW_SAMPLE" : "ONGOING_SHADOW_MONITORING",
     note: "Draft-only; no public predictions or betting recommendations.",
     matches: matches.map((match) => ({
