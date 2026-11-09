@@ -2,6 +2,9 @@ name: Review NeoBet football shadow predictions
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Generate NeoBet football shadow predictions"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -9,6 +12,7 @@ permissions:
 jobs:
   review:
     name: Score settled shadow forecasts
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

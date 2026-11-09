@@ -2,6 +2,9 @@ name: Generate NeoBet football shadow predictions
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Sync NeoBet sports data"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -9,6 +12,7 @@ permissions:
 jobs:
   shadow-predictions:
     name: Save unpublished NO BET forecasts
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
