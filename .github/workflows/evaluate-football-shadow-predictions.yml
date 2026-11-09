@@ -1,0 +1,36 @@
+name: Review NeoBet football shadow predictions
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Score settled shadow forecasts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Evaluate finished fixtures from remote D1
+        run: node scripts/evaluate-football-shadow-predictions.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_D1_DATABASE_ID: efb484b0-ea00-49c8-9955-165b1f003b95
+
+      - name: Save shadow evaluation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: neobet-football-shadow-evaluation
+          path: ${{ runner.temp }}/neobet-football-shadow-evaluation.json
+          if-no-files-found: error
+          retention-days: 30
