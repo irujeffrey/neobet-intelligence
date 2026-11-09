@@ -47,6 +47,7 @@
 
   const pageNames = { home: "Overview", football: "Football centre", basketball: "Basketball centre", picks: "Best picks", performance: "Performance", audit: "Prediction audit", "match-analysis": "Match analysis", methodology: "Methodology", responsible: "Responsible use", privacy: "Privacy", terms: "Terms", admin: "Admin dashboard" };
   const homeMarkup = document.getElementById("page-content").innerHTML;
+  let selectedFixture = null;
   const emptyNotice = (label, title, body) => `<div class="page-empty"><div class="page-empty-mark">✳</div><div><div class="empty-label"><span></span> ${label}</div><h3>${title}</h3><p>${body}</p></div></div>`;
   const pageMarkup = {
     football: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Football<span class="title-period">.</span></h1><p class="subhead">Upcoming fixtures from Football-Data.org, shown in your local time.</p></div><span class="page-status">● FOOTBALL-DATA.ORG FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-football>↻ Refresh</button></div><div class="football-fixture-list" id="football-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming football fixtures…</p></div></section>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixtures are not predictions.", "Upcoming matches are shown from the provider feed. Probabilities and picks will appear only after a calibrated football model passes quality checks.")}<section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
@@ -54,7 +55,7 @@
     picks: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHORTLIST</div><h1>Best picks<span class="title-period">.</span></h1><p class="subhead">Ranked by calibrated probability, data reliability, and quality checks.</p></div></div>${emptyNotice("NO ELIGIBLE PICKS", "Nothing is ranked without evidence.", "Picks will appear only when model outputs are calibrated and pass data quality and freshness checks. Attractive odds alone cannot move a selection up the ranking.")}<section class="page-panel"><div class="eyebrow small-eyebrow">RANKING PRINCIPLES</div><div class="principle-grid"><div><b>01</b><strong>Calibrated probability</strong><small>Model output on a validated probability scale.</small></div><div><b>02</b><strong>Data reliability</strong><small>Fresh, complete, and attributable source data.</small></div><div><b>03</b><strong>Betting value</strong><small>Shown separately when licensed odds exist.</small></div></div></section>`,
     performance: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRACK RECORD</div><h1>Performance<span class="title-period">.</span></h1><p class="subhead">A transparent record of published predictions and settled outcomes.</p></div></div><section class="stats-grid page-stats"><article class="stat-card"><div class="stat-heading">SETTLED PREDICTIONS</div><div class="stat-value">—</div><div class="stat-foot muted">No settled records</div></article><article class="stat-card"><div class="stat-heading">ACCURACY</div><div class="stat-value">—<small>%</small></div><div class="stat-foot muted">Not yet available</div></article><article class="stat-card"><div class="stat-heading">BRIER SCORE</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article><article class="stat-card"><div class="stat-heading">LOG LOSS</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article></section>${emptyNotice("NO SETTLED RESULTS", "The record begins when predictions are published.", "Performance will be calculated from the permanent prediction audit. No historical results or ROI are fabricated.")}`,
     audit: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> PERMANENT RECORD</div><h1>Prediction audit<span class="title-period">.</span></h1><p class="subhead">Original timestamps, model versions, and settlement outcomes.</p></div></div>${emptyNotice("AUDIT VIEW PENDING", "Every published prediction will leave a trace.", "The database schema is ready. The audit interface will be connected when calibrated predictions and settlements are implemented.")}<section class="page-panel"><div class="eyebrow small-eyebrow">RECORDED FOR EACH PICK</div><div class="principle-grid"><div><b>01</b><strong>Original prediction</strong><small>Sport, market, probability, model version, and published time.</small></div><div><b>02</b><strong>Settlement</strong><small>Win, loss, push, or void against the verified result.</small></div><div><b>03</b><strong>Evaluation</strong><small>Accuracy and probability scoring by sport and market.</small></div></div></section>`,
-    "match-analysis": `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> MATCH REPORT</div><h1>Match analysis<span class="title-period">.</span></h1><p class="subhead">Model probabilities and verified context for one fixture.</p></div></div>${emptyNotice("NO MATCH SELECTED", "Match analysis will use verified inputs only.", "Select a verified fixture once a licensed data source is connected. Probability, model confidence, data quality, and betting value will be reported as separate measurements.")}<section class="page-panel"><div class="eyebrow small-eyebrow">PREDICTION DISPLAY</div><div class="principle-grid"><div><b>01</b><strong>Probability</strong><small>Calibrated chance for the selected outcome.</small></div><div><b>02</b><strong>Model confidence</strong><small>Separate estimate of model reliability.</small></div><div><b>03</b><strong>Data quality &amp; value</strong><small>Source freshness and odds context, shown independently.</small></div></div></section>`,
+    "match-analysis": `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> MATCH REPORT</div><h1>Match analysis<span class="title-period">.</span></h1><p class="subhead">Verified fixture details and model status.</p></div></div><div id="selected-match-analysis"></div><section class="page-panel"><div class="eyebrow small-eyebrow">PREDICTION DISPLAY</div><div class="principle-grid"><div><b>01</b><strong>Probability</strong><small>Shown only when a calibrated prediction is available.</small></div><div><b>02</b><strong>Model confidence</strong><small>Reported separately from probability.</small></div><div><b>03</b><strong>Data quality &amp; value</strong><small>Source freshness and odds context, shown independently.</small></div></div></section>`,
     methodology: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> HOW IT WORKS</div><h1>Methodology<span class="title-period">.</span></h1><p class="subhead">Numerical predictions come from statistical models. Explanations must follow verified inputs.</p></div></div><section class="page-panel methodology-panel"><div class="eyebrow small-eyebrow">THE PRINCIPLES</div><div class="method-row"><span>01</span><div><strong>Calibrated probabilities</strong><p>Certainty labels come from calibrated model probabilities, not subjective opinions. Football and basketball share the same thresholds.</p></div></div><div class="method-row"><span>02</span><div><strong>Independent measurements</strong><p>Probability, model confidence, data quality, and betting value answer different questions and remain separate in the interface.</p></div></div><div class="method-row"><span>03</span><div><strong>Data quality gates</strong><p>Uncalibrated output, poor source quality, stale required odds, or excessive model uncertainty results in a grey NO BET.</p></div></div><div class="method-row"><span>04</span><div><strong>Permanent audit</strong><p>Published predictions retain their original timestamp and model version, then settle against verified results.</p></div></div></section><section class="page-panel"><div class="eyebrow small-eyebrow">CERTAINTY SCALE</div><div class="certainty-legend page-legend"></div><p class="panel-footnote">These probability ranges describe model estimates. They do not imply that an outcome is guaranteed.</p></section>`,
     responsible: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESPONSIBLE USE</div><h1>Keep perspective<span class="title-period">.</span></h1><p class="subhead">Sports outcomes are uncertain. A probability is an estimate, not a promise.</p></div></div><section class="page-panel responsible-panel"><div class="responsible-symbol">♡</div><h2>For information and entertainment.</h2><p>NeoBet Intelligence is designed to explain model estimates and their limitations. It does not guarantee results or provide financial advice. Never stake money you cannot afford to lose, and take a break if betting stops being enjoyable.</p><p>Predictions can be wrong even when data is complete and the model is calibrated. NO BET means the available information does not meet our current reliability checks.</p></section>`,
     privacy: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> LEGAL</div><h1>Privacy<span class="title-period">.</span></h1><p class="subhead">A starter privacy notice for the development preview.</p></div></div><section class="page-panel"><h2>Preview status</h2><p class="panel-copy">This site does not include accounts, tracking analytics, or advertising. It requests football and basketball fixture data server-side and stores it in Cloudflare D1. Hosting providers may process standard server logs. This draft must be updated before adding analytics, advertising, or user accounts.</p><p class="panel-footnote">This draft is not legal advice and must be reviewed for the deployed service and its actual providers.</p></section>`,
@@ -77,6 +78,7 @@
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
     if (page === "football") loadFootballFixtures(content);
+    if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
     content.querySelectorAll(".view-all").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showPage(link.getAttribute("href").slice(1)); }));
     document.querySelector(".sidebar").classList.remove("menu-open");
@@ -161,6 +163,7 @@
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
     if (page === "football") loadFootballFixtures(content);
+    if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
     content.querySelectorAll(".view-all").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showPage(link.getAttribute("href").slice(1)); }));
     if (page === "home") refreshProviderStatus();
@@ -205,6 +208,20 @@
       fixtures.forEach((fixture) => {
         const card = document.createElement("article");
         card.className = "fixture-card";
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `View match analysis: ${fixture.home_team || "Home team"} versus ${fixture.away_team || "Away team"}`);
+        const openAnalysis = () => {
+          selectedFixture = fixture;
+          showPage("match-analysis");
+        };
+        card.addEventListener("click", openAnalysis);
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openAnalysis();
+          }
+        });
 
         const meta = document.createElement("div");
         meta.className = "fixture-card-meta";
@@ -261,6 +278,61 @@
       retry.addEventListener("click", () => loadFootballFixtures(content));
       list.replaceChildren(error, retry);
     }
+  }
+
+  function renderMatchAnalysis(content) {
+    const target = content.querySelector("#selected-match-analysis");
+    if (!target) return;
+    if (!selectedFixture) {
+      target.innerHTML = emptyNotice(
+        "NO MATCH SELECTED",
+        "Match analysis uses verified inputs only.",
+        "Choose a fixture from the Football page. Since no calibrated prediction is currently available, the decision remains NO BET.",
+      );
+      return;
+    }
+
+    const fixture = selectedFixture;
+    const panel = document.createElement("section");
+    panel.className = "page-panel selected-match-panel";
+    const competition = document.createElement("div");
+    competition.className = "eyebrow small-eyebrow";
+    competition.textContent = fixture.competition || "Football";
+    const teams = document.createElement("h2");
+    teams.className = "selected-match-teams";
+    teams.textContent = `${fixture.home_team || "Home team"} vs ${fixture.away_team || "Away team"}`;
+    const kickoff = document.createElement("time");
+    kickoff.className = "selected-match-kickoff";
+    kickoff.dateTime = fixture.scheduled_at;
+    kickoff.textContent = new Intl.DateTimeFormat(undefined, {
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    }).format(new Date(fixture.scheduled_at));
+
+    const certainty = window.NeoBet.getCertainty({
+      noBetReason: "No calibrated prediction is available for this fixture",
+    });
+    const decision = document.createElement("div");
+    decision.className = "fixture-decision selected-match-decision";
+    const badge = document.createElement("span");
+    badge.className = "fixture-no-bet";
+    badge.textContent = certainty.label;
+    const reason = document.createElement("span");
+    reason.className = "fixture-no-bet-reason";
+    reason.textContent = certainty.reason;
+    decision.append(badge, reason);
+
+    const probability = document.createElement("p");
+    probability.className = "selected-match-probability";
+    probability.textContent = "Probability: unavailable — no calibrated prediction";
+    const back = document.createElement("button");
+    back.className = "button button-quiet selected-match-back";
+    back.type = "button";
+    back.textContent = "Back to football fixtures";
+    back.addEventListener("click", () => showPage("football"));
+
+    panel.append(competition, teams, kickoff, decision, probability, back);
+    target.replaceChildren(panel);
   }
 
   let toastTimer;
