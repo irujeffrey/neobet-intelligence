@@ -536,48 +536,8 @@ async function api(request, env, url) {
     }
   }
 
-async function runGeminiAnalysis(env, matchData) {
-  const apiKey = env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    throw new Error("Gemini API key is not configured.");
-  }
 
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      body: JSON.stringify({
-        contents: [{
-          role: "user",
-          parts: [{
-            text: `Independently analyse this football match using only the supplied data.
-Do not invent statistics or odds.
-Return a cautious assessment, likely 1X2 outcome (Home, Draw, or Away), supporting evidence, uncertainties, and whether the evidence is insufficient.
-
-Match data:
-${JSON.stringify(matchData)}`
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
-        }
-      })
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
-  }
-
-  const result = await response.json();
-
-  return result.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 }
 
 export default {
