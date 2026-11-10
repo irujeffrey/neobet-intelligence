@@ -45,7 +45,7 @@
     }).join("") + '<div class="certainty-item"><span class="certainty-swatch no-bet-swatch"></span><div><strong>NO BET</strong><small>Insufficient data</small></div></div>';
   }
 
-  const pageNames = { home: "Overview", football: "Football centre", basketball: "Basketball centre", picks: "Best picks", performance: "Performance", audit: "Prediction audit", "match-analysis": "Match analysis", methodology: "Methodology", responsible: "Responsible use", privacy: "Privacy", terms: "Terms", admin: "Admin dashboard" };
+  const pageNames = { home: "Overview", football: "Football centre", basketball: "Basketball centre", picks: "Best picks", performance: "Performance", "model-lab": "Model Lab", audit: "Prediction audit", "match-analysis": "Match analysis", methodology: "Methodology", responsible: "Responsible use", privacy: "Privacy", terms: "Terms", admin: "Admin dashboard" };
   const homeMarkup = document.getElementById("page-content").innerHTML;
   let selectedFixture = null;
   const emptyNotice = (label, title, body) => `<div class="page-empty"><div class="page-empty-mark">✳</div><div><div class="empty-label"><span></span> ${label}</div><h3>${title}</h3><p>${body}</p></div></div>`;
@@ -54,6 +54,7 @@
     basketball: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Basketball<span class="title-period">.</span></h1><p class="subhead">Team strength, pace-aware projections, and transparent match analysis.</p></div><span class="page-status">● API NINJAS FEED</span></div>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixture data and predictions are separate.", "Run the GitHub sports-data sync to load NBA/WNBA schedules and results. Picks appear after a calibrated basketball model passes quality checks. Use the fixture feed link below to review imported data.")}<p class="panel-footnote"><a href="/api/fixtures?sport=basketball">Open basketball fixture data</a></p><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
     picks: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHORTLIST</div><h1>Best picks<span class="title-period">.</span></h1><p class="subhead">Ranked by calibrated probability, data reliability, and quality checks.</p></div></div>${emptyNotice("NO ELIGIBLE PICKS", "Nothing is ranked without evidence.", "Picks will appear only when model outputs are calibrated and pass data quality and freshness checks. Attractive odds alone cannot move a selection up the ranking.")}<section class="page-panel"><div class="eyebrow small-eyebrow">RANKING PRINCIPLES</div><div class="principle-grid"><div><b>01</b><strong>Calibrated probability</strong><small>Model output on a validated probability scale.</small></div><div><b>02</b><strong>Data reliability</strong><small>Fresh, complete, and attributable source data.</small></div><div><b>03</b><strong>Betting value</strong><small>Shown separately when licensed odds exist.</small></div></div></section>`,
     performance: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRACK RECORD</div><h1>Performance<span class="title-period">.</span></h1><p class="subhead">A transparent record of published predictions and settled outcomes.</p></div></div><section class="stats-grid page-stats"><article class="stat-card"><div class="stat-heading">SETTLED PREDICTIONS</div><div class="stat-value">—</div><div class="stat-foot muted">No settled records</div></article><article class="stat-card"><div class="stat-heading">ACCURACY</div><div class="stat-value">—<small>%</small></div><div class="stat-foot muted">Not yet available</div></article><article class="stat-card"><div class="stat-heading">BRIER SCORE</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article><article class="stat-card"><div class="stat-heading">LOG LOSS</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article></section>${emptyNotice("NO SETTLED RESULTS", "The record begins when predictions are published.", "Performance will be calculated from the permanent prediction audit. No historical results or ROI are fabricated.")}`,
+    "model-lab": `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> OPEN EXPERIMENT</div><h1>Model Lab<span class="title-period">.</span></h1><p class="subhead">Public view of unverified football shadow forecasts and their settled results.</p></div><span class="page-status shadow-status">UNVERIFIED · NO BET</span></div><section class="page-panel shadow-disclosure"><strong>Experimental model output</strong><p>These probabilities are published for transparency while the model is evaluated. They are not calibrated public picks, do not include assessed betting value, and are not recommendations. NO BET remains the decision.</p></section><div id="shadow-lab-content" aria-live="polite"><p class="fixture-message">Loading public experiment results…</p></div>`,
     audit: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> PERMANENT RECORD</div><h1>Prediction audit<span class="title-period">.</span></h1><p class="subhead">Original timestamps, model versions, and settlement outcomes.</p></div></div>${emptyNotice("AUDIT VIEW PENDING", "Every published prediction will leave a trace.", "The database schema is ready. The audit interface will be connected when calibrated predictions and settlements are implemented.")}<section class="page-panel"><div class="eyebrow small-eyebrow">RECORDED FOR EACH PICK</div><div class="principle-grid"><div><b>01</b><strong>Original prediction</strong><small>Sport, market, probability, model version, and published time.</small></div><div><b>02</b><strong>Settlement</strong><small>Win, loss, push, or void against the verified result.</small></div><div><b>03</b><strong>Evaluation</strong><small>Accuracy and probability scoring by sport and market.</small></div></div></section>`,
     "match-analysis": `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> MATCH REPORT</div><h1>Match analysis<span class="title-period">.</span></h1><p class="subhead">Verified fixture details and model status.</p></div></div><div id="selected-match-analysis"></div><section class="page-panel"><div class="eyebrow small-eyebrow">PREDICTION DISPLAY</div><div class="principle-grid"><div><b>01</b><strong>Probability</strong><small>Shown only when a calibrated prediction is available.</small></div><div><b>02</b><strong>Model confidence</strong><small>Reported separately from probability.</small></div><div><b>03</b><strong>Data quality &amp; value</strong><small>Source freshness and odds context, shown independently.</small></div></div></section>`,
     methodology: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> HOW IT WORKS</div><h1>Methodology<span class="title-period">.</span></h1><p class="subhead">Numerical predictions come from statistical models. Explanations must follow verified inputs.</p></div></div><section class="page-panel methodology-panel"><div class="eyebrow small-eyebrow">THE PRINCIPLES</div><div class="method-row"><span>01</span><div><strong>Calibrated probabilities</strong><p>Certainty labels come from calibrated model probabilities, not subjective opinions. Football and basketball share the same thresholds.</p></div></div><div class="method-row"><span>02</span><div><strong>Independent measurements</strong><p>Probability, model confidence, data quality, and betting value answer different questions and remain separate in the interface.</p></div></div><div class="method-row"><span>03</span><div><strong>Data quality gates</strong><p>Uncalibrated output, poor source quality, stale required odds, or excessive model uncertainty results in a grey NO BET.</p></div></div><div class="method-row"><span>04</span><div><strong>Permanent audit</strong><p>Published predictions retain their original timestamp and model version, then settle against verified results.</p></div></div></section><section class="page-panel"><div class="eyebrow small-eyebrow">CERTAINTY SCALE</div><div class="certainty-legend page-legend"></div><p class="panel-footnote">These probability ranges describe model estimates. They do not imply that an outcome is guaranteed.</p></section>`,
@@ -78,6 +79,7 @@
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
     if (page === "football") loadFootballFixtures(content);
+    if (page === "model-lab") loadShadowLab(content);
     if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
     content.querySelectorAll(".view-all").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showPage(link.getAttribute("href").slice(1)); }));
@@ -167,6 +169,137 @@
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
     content.querySelectorAll(".view-all").forEach((link) => link.addEventListener("click", (event) => { event.preventDefault(); showPage(link.getAttribute("href").slice(1)); }));
     if (page === "home") refreshProviderStatus();
+  }
+
+  async function loadShadowLab(content) {
+    const target = content.querySelector("#shadow-lab-content");
+    if (!target) return;
+    target.replaceChildren();
+    const loading = document.createElement("p");
+    loading.className = "fixture-message";
+    loading.textContent = "Loading public experiment results…";
+    target.append(loading);
+    try {
+      const response = await fetch("/api/shadow-lab", { cache: "no-store" });
+      if (!response.ok) throw new Error("Experiment data unavailable");
+      const result = await response.json();
+      target.replaceChildren();
+      const leagues = Array.isArray(result.leagues) ? result.leagues : [];
+      if (!leagues.length) {
+        const empty = document.createElement("p");
+        empty.className = "fixture-message";
+        empty.textContent = "No shadow experiment data is available yet.";
+        target.append(empty);
+        return;
+      }
+      const percentage = (value) => Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : "—";
+      const score = (value) => Number.isFinite(value) ? value.toFixed(4) : "—";
+      const metrics = [
+        ["SETTLED FORECASTS", (league) => league.metrics?.settled_matches ?? 0],
+        ["ACCURACY", (league) => percentage(league.metrics?.accuracy)],
+        ["MULTICLASS BRIER · LOWER IS BETTER", (league) => score(league.metrics?.multiclass_brier_score)],
+        ["LOG LOSS · LOWER IS BETTER", (league) => score(league.metrics?.log_loss)],
+        ["MEAN ONE-VS-REST ECE", (league) => percentage(league.metrics?.mean_one_vs_rest_ece)],
+      ];
+      for (const league of leagues) {
+        const section = document.createElement("section");
+        section.className = "page-panel shadow-league";
+        const heading = document.createElement("div");
+        heading.className = "shadow-league-heading";
+        const title = document.createElement("h2");
+        title.textContent = league.competition || "Football competition";
+        const status = document.createElement("span");
+        status.className = "fixture-no-bet shadow-no-bet";
+        status.textContent = "UNVERIFIED · NO BET";
+        heading.append(title, status);
+        section.append(heading);
+
+        const metricGrid = document.createElement("div");
+        metricGrid.className = "shadow-metric-grid";
+        for (const [label, getValue] of metrics) {
+          const card = document.createElement("article");
+          card.className = "shadow-metric";
+          const name = document.createElement("span");
+          name.textContent = label;
+          const value = document.createElement("strong");
+          value.textContent = String(getValue(league));
+          card.append(name, value);
+          metricGrid.append(card);
+        }
+        section.append(metricGrid);
+        const count = league.metrics?.settled_matches || 0;
+        const sampleNote = document.createElement("p");
+        sampleNote.className = "panel-footnote";
+        sampleNote.textContent = count ? `Scored on ${count} settled shadow forecasts. This is an ongoing experiment, not approval for live picks.` : "No shadow forecasts have settled yet. Scores will appear after results are synced.";
+        section.append(sampleNote);
+
+        const upcoming = Array.isArray(league.upcoming) ? league.upcoming : [];
+        const upcomingHeading = document.createElement("h3");
+        upcomingHeading.className = "shadow-subheading";
+        upcomingHeading.textContent = `Upcoming experimental estimates (${upcoming.length})`;
+        section.append(upcomingHeading);
+        if (!upcoming.length) {
+          const none = document.createElement("p");
+          none.className = "fixture-message";
+          none.textContent = "No upcoming shadow estimates are available.";
+          section.append(none);
+        } else {
+          const list = document.createElement("div");
+          list.className = "shadow-forecast-list";
+          for (const match of upcoming) {
+            const card = document.createElement("article");
+            card.className = "shadow-forecast-card";
+            const teams = document.createElement("strong");
+            teams.textContent = `${match.home_team || "Home"} vs ${match.away_team || "Away"}`;
+            const date = document.createElement("time");
+            date.dateTime = match.scheduled_at;
+            date.textContent = Number.isFinite(Date.parse(match.scheduled_at))
+              ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(match.scheduled_at))
+              : "Kickoff unavailable";
+            const probabilities = document.createElement("p");
+            probabilities.textContent = `Model estimate · Home ${percentage(match.probabilities?.home)} · Draw ${percentage(match.probabilities?.draw)} · Away ${percentage(match.probabilities?.away)}`;
+            const noBet = document.createElement("span");
+            noBet.className = "fixture-no-bet shadow-no-bet";
+            noBet.textContent = "NO BET";
+            card.append(teams, date, probabilities, noBet);
+            list.append(card);
+          }
+          section.append(list);
+        }
+
+        const settled = Array.isArray(league.recent_settled) ? league.recent_settled : [];
+        const settledHeading = document.createElement("h3");
+        settledHeading.className = "shadow-subheading";
+        settledHeading.textContent = `Recent settled test forecasts (${settled.length})`;
+        section.append(settledHeading);
+        if (!settled.length) {
+          const none = document.createElement("p");
+          none.className = "fixture-message";
+          none.textContent = "Settled forecast history will appear here as match results arrive.";
+          section.append(none);
+        } else {
+          const list = document.createElement("div");
+          list.className = "shadow-settled-list";
+          for (const match of settled) {
+            const row = document.createElement("article");
+            row.className = "shadow-settled-row";
+            const fixture = document.createElement("strong");
+            fixture.textContent = `${match.home_team} ${match.home_score}–${match.away_score} ${match.away_team}`;
+            const outcome = document.createElement("span");
+            outcome.textContent = `Result: ${match.actual} · Model: H ${percentage(match.probabilities?.home)} / D ${percentage(match.probabilities?.draw)} / A ${percentage(match.probabilities?.away)}`;
+            row.append(fixture, outcome);
+            list.append(row);
+          }
+          section.append(list);
+        }
+        target.append(section);
+      }
+    } catch {
+      const error = document.createElement("p");
+      error.className = "fixture-message fixture-error";
+      error.textContent = "Public experiment results could not be loaded. Please try again later.";
+      target.replaceChildren(error);
+    }
   }
 
   async function loadFootballFixtures(content) {
