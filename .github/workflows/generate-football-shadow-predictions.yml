@@ -43,4 +43,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 execute neobet-intelligence-db --remote --command "SELECT model_version_id, model_name, model_version, status, decision, calibrated, COUNT(*) AS rows FROM predictions WHERE model_version_id IN ('football-poisson-dirichlet-shadow-0-1-0','football-poisson-dirichlet-shadow-pt-1-0-1-0') GROUP BY model_version_id, model_name, model_version, status, decision, calibrated;"
+          command: d1 execute neobet-intelligence-db --remote --command "SELECT model_version_id, model_name, model_version, status, decision, calibrated, COUNT(*) AS rows FROM predictions WHERE model_version_id IN ('football-poisson-dirichlet-shadow-0-1-0','football-poisson-dirichlet-shadow-en-2-0-1-0','football-poisson-dirichlet-shadow-pt-1-0-1-0','football-poisson-dirichlet-shadow-it-1-0-1-0','football-poisson-dirichlet-shadow-br-1-0-1-0') GROUP BY model_version_id, model_name, model_version, status, decision, calibrated;"
