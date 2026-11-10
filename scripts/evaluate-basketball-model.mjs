@@ -179,11 +179,13 @@ function evaluateSeason(games) {
       message: `Need at least ${MIN_TRAIN_GAMES} training, ${MIN_VALIDATION_GAMES} validation, and ${MIN_TEST_GAMES} held-out completed games.`,
     };
   }
-  const temperature = fitTemperature(validation);
+  const validationWithTargets = validation.map(({ game, probability: p }) => ({
+    game, actual: outcome(game), probability: p,
+  }));
+  const temperature = fitTemperature(validationWithTargets);
   const homeRate = training.filter(({ game }) => outcome(game) === 1).length / training.length;
   const constantHome = test.map(({ game }) => ({ game, actual: outcome(game), probability: homeRate }));
   const rawTest = test.map(({ game, probability: p }) => ({ game, actual: outcome(game), probability: p }));
-  const validationWithTargets = validation.map(({ game, probability: p }) => ({ game, actual: outcome(game), probability: p }));
   const evaluated = {
     raw_elo: metrics(rawTest),
     temperature_scaled_elo: metrics(rawTest, (p) => sigmoid(logit(p) / temperature)),
@@ -278,13 +280,14 @@ async function main() {
       `- Evaluation: ${report.evaluation_type}`,
       `- Public status: ${report.public_status}`,
       "",
-      "| League | Season | Status | Completed | Train | Validation | Held out | Raw Brier | Scaled Brier | Raw log loss | Scaled log loss |",
-      "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+      "| League | Season | Status | Completed | Train | Validation | Held out | Raw Brier | Scaled Brier | Home-rate Brier | Raw log loss | Scaled log loss | Home-rate log loss |",
+      "|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ];
     for (const result of evaluations) {
       const raw = result.metrics?.raw_elo;
       const scaled = result.metrics?.temperature_scaled_elo;
-      lines.push(`| ${result.competition} | ${result.season || "—"} | ${result.status} | ${result.completed_games ?? 0} | ${result.training_games ?? 0} | ${result.validation_games ?? 0} | ${result.held_out_games ?? 0} | ${raw ? raw.brier_score.toFixed(4) : "—"} | ${scaled ? scaled.brier_score.toFixed(4) : "—"} | ${raw ? raw.log_loss.toFixed(4) : "—"} | ${scaled ? scaled.log_loss.toFixed(4) : "—"} |`);
+      const baseline = result.metrics?.training_home_win_rate_baseline;
+      lines.push(`| ${result.competition} | ${result.season || "—"} | ${result.status} | ${result.completed_games ?? 0} | ${result.training_games ?? 0} | ${result.validation_games ?? 0} | ${result.held_out_games ?? 0} | ${raw ? raw.brier_score.toFixed(4) : "—"} | ${scaled ? scaled.brier_score.toFixed(4) : "—"} | ${baseline ? baseline.brier_score.toFixed(4) : "—"} | ${raw ? raw.log_loss.toFixed(4) : "—"} | ${scaled ? scaled.log_loss.toFixed(4) : "—"} | ${baseline ? baseline.log_loss.toFixed(4) : "—"} |`);
     }
     lines.push("", "Metrics are chronological and evaluation-only. Same-day results are excluded from rating updates until the following date.",
       "The free API source has only current-season history, so this report does not test transfer to a new season.", "");
