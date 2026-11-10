@@ -160,7 +160,7 @@ async function api(request, env, url) {
     try {
       const ids = modelProfiles.map((profile) => `'${profile.id}'`).join(",");
       const result = await env.DB.prepare(`
-        SELECT p.fixture_id, p.model_version_id, p.selection, p.probability, p.created_at,
+        SELECT p.fixture_id, p.model_version_id, p.selection, p.probability, p.data_quality, p.created_at,
           f.scheduled_at, f.status, f.home_score, f.away_score,
           competition.name AS competition, home.name AS home_team, away.name AS away_team
         FROM predictions AS p
@@ -175,7 +175,7 @@ async function api(request, env, url) {
         LIMIT 6000
       `).all();
       const dailyFixtures = await env.DB.prepare(`
-        SELECT f.id AS fixture_id, f.scheduled_at, f.data_quality,
+        SELECT f.id AS fixture_id, f.scheduled_at, f.data_quality, f.source_updated_at,
           competition.name AS competition, home.name AS home_team, away.name AS away_team
         FROM fixtures AS f
         LEFT JOIN competitions AS competition ON competition.id = f.competition_id
@@ -197,13 +197,14 @@ async function api(request, env, url) {
           fixture_id: row.fixture_id, scheduled_at: row.scheduled_at, status: row.status,
           home_team: row.home_team, away_team: row.away_team,
           home_score: row.home_score, away_score: row.away_score,
-          created_at: row.created_at, probabilities: {},
+          created_at: row.created_at, data_quality: row.data_quality, probabilities: {},
         });
         groups.get(key).probabilities[row.selection] = row.probability;
       }
       const complete = [...groups.values()].filter((match) => {
         const outcomes = ["home", "draw", "away"];
         if (outcomes.some((outcome) => !Number.isFinite(match.probabilities[outcome]))) return false;
+        if (outcomes.some((outcome) => match.probabilities[outcome] < 0 || match.probabilities[outcome] > 1)) return false;
         const total = outcomes.reduce((sum, outcome) => sum + match.probabilities[outcome], 0);
         return Math.abs(total - 1) <= 0.002 && Date.parse(match.created_at) < Date.parse(match.scheduled_at);
       });
@@ -248,23 +249,39 @@ async function api(request, env, url) {
         const settled = profileMatches.filter((match) => match.status === "finished" &&
           Number.isInteger(match.home_score) && Number.isInteger(match.away_score));
         const forecastByFixture = new Map(profileMatches
-          .filter((match) => match.status === "scheduled" && Date.parse(match.scheduled_at) > now)
+          .filter((match) => match.status === "scheduled" && match.data_quality === "good" && Date.parse(match.scheduled_at) > now)
           .map((match) => [match.fixture_id, match]));
         const upcoming = (dailyFixtures.results || []).filter((fixture) => fixture.competition === profile.competition)
           .map((fixture) => {
             const forecast = forecastByFixture.get(fixture.fixture_id);
+            const sourceUpdatedAt = Date.parse(fixture.source_updated_at);
+            const sourceFresh = Number.isFinite(sourceUpdatedAt) && now - sourceUpdatedAt <= 7 * 86400000 && sourceUpdatedAt <= now;
+            const eligible = fixture.data_quality === "good" && sourceFresh && forecast &&
+              fixture.scheduled_at > nowIso;
+            const reason = fixture.data_quality !== "good"
+              ? "Fixture data quality is not rated good; NO BET."
+              : !sourceFresh
+                ? "Fixture source data is missing or older than seven days; NO BET."
+                : !forecast
+                  ? "No eligible league model estimate is available; NO BET."
+                  : "Experimental model lean only. It is not a calibrated or approved betting pick; NO BET.";
             return {
               fixture_id: fixture.fixture_id, scheduled_at: fixture.scheduled_at,
               home_team: fixture.home_team, away_team: fixture.away_team,
-              data_quality: fixture.data_quality, probabilities: forecast?.probabilities || null,
+              data_quality: fixture.data_quality, source_updated_at: fixture.source_updated_at,
+              probabilities: eligible ? forecast.probabilities : null,
+              experimental_selection: eligible
+                ? ["home", "draw", "away"].reduce((best, outcome) =>
+                  forecast.probabilities[outcome] > forecast.probabilities[best] ? outcome : best, "home")
+                : null,
               decision: "NO BET",
-              reason: forecast ? "Public experimental estimate only; no approved pick." : "No eligible league model estimate is available; NO BET.",
+              reason,
             };
           });
         return {
           competition: profile.competition,
           model_status: profileMatches.length
-            ? "unverified shadow experiment; not approved for public picks"
+            ? "unverified public experiment; not approved betting picks"
             : "no eligible shadow model forecast; NO BET",
           metrics: score(settled),
           upcoming: upcoming.slice(0, 30),
@@ -279,7 +296,8 @@ async function api(request, env, url) {
           fixture_id: fixture.fixture_id, scheduled_at: fixture.scheduled_at,
           home_team: fixture.home_team, away_team: fixture.away_team,
           data_quality: fixture.data_quality, probabilities: null, decision: "NO BET",
-          reason: "No eligible league model estimate is available; NO BET.",
+          experimental_selection: null,
+          reason: "No eligible league model estimate is available for this competition; NO BET.",
         });
       }
       for (const [competition, upcoming] of additionalCompetitions) {
@@ -287,7 +305,9 @@ async function api(request, env, url) {
           metrics: score([]), upcoming });
       }
       return json({ generated_at: new Date().toISOString(), day_from: from, day_to: to,
-        publication_status: "public experimental results; no approved picks", leagues });
+        publication_status: "public experimental model leans; every fixture remains NO BET",
+        safeguards: { requires_good_data_quality: true, max_source_age_days: 7, calibrated: false, approved_for_betting: false },
+        leagues });
     } catch {
       return json({ error: "Shadow experiment results are temporarily unavailable" }, 503);
     }
