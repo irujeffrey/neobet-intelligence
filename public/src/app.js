@@ -51,8 +51,8 @@
   const emptyNotice = (label, title, body) => `<div class="page-empty"><div class="page-empty-mark">✳</div><div><div class="empty-label"><span></span> ${label}</div><h3>${title}</h3><p>${body}</p></div></div>`;
   const pageMarkup = {
     football: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Football<span class="title-period">.</span></h1><p class="subhead">Upcoming fixtures from Football-Data.org, shown in your local time.</p></div><span class="page-status">● FOOTBALL-DATA.ORG FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-football>↻ Refresh</button></div><div class="sports-fixture-list" id="football-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming football fixtures…</p></div></section><section class="page-panel shadow-disclosure"><strong>Today’s public experimental football picks</strong><p>Open the daily board for experimental model leans across today’s competitions. These are not approved bets: every selection remains NO BET, and estimates are hidden when data or model checks fail.</p><button class="button button-quiet" type="button" data-goto="model-lab">View today’s experimental picks →</button></section><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
-    basketball: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Basketball<span class="title-period">.</span></h1><p class="subhead">Upcoming NBA and WNBA fixtures from API Ninjas, shown in your local time.</p></div><span class="page-status">● API NINJAS FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-basketball>↻ Refresh</button></div><div class="sports-fixture-list" id="basketball-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming basketball fixtures…</p></div></section>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixtures are not predictions.", "API Ninjas supplies upcoming schedules and results. Basketball predictions remain grey NO BET until a basketball model is built, evaluated, and passes calibration checks.")}<section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
-    picks: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHORTLIST</div><h1>Best picks<span class="title-period">.</span></h1><p class="subhead">Approved picks are ranked only after calibration and quality checks.</p></div></div>${emptyNotice("NO APPROVED BETS", "Experimental football leans are public.", "Today’s Model Lab board shows the leading model outcome and its probability for eligible matches. They are clearly marked experimental, and every selection remains NO BET until it passes approval gates.")}<div class="experimental-board-link"><span>PUBLIC DAILY EXPERIMENT</span><button class="button button-quiet" type="button" data-goto="model-lab">View today’s experimental picks →</button></div><section class="page-panel"><div class="eyebrow small-eyebrow">APPROVAL GATES</div><div class="principle-grid"><div><b>01</b><strong>Calibration</strong><small>Chronological held-out performance must support published probabilities.</small></div><div><b>02</b><strong>Data reliability</strong><small>Fixture data must be good quality and updated within seven days.</small></div><div><b>03</b><strong>Betting value</strong><small>Value remains a separate measure; no odds are currently assessed.</small></div></div></section>`,
+    basketball: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Basketball<span class="title-period">.</span></h1><p class="subhead">NBA and WNBA fixtures with a separate public, experimental NBA model board.</p></div><span class="page-status">● API NINJAS FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-basketball>↻ Refresh</button></div><div class="sports-fixture-list" id="basketball-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming basketball fixtures…</p></div></section><section class="page-panel shadow-disclosure"><div class="shadow-league-heading"><strong>Today’s experimental NBA picks</strong><span class="fixture-no-bet shadow-no-bet">NO BET · EXPERIMENTAL</span></div><p>Eligible games show the leading score-history estimate and exact probability. The model is uncalibrated, betting value is not assessed, and every game remains grey NO BET. Estimates are hidden if source licensing, fixture quality, freshness, or timing checks fail.</p><button class="button button-quiet" type="button" data-refresh-basketball-experiment>↻ Refresh NBA experiment</button><div id="basketball-shadow-content" aria-live="polite"><p class="fixture-message">Loading today’s NBA experimental estimates…</p></div></section><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">Experimental NBA probabilities do not receive certainty colours until calibration and publication checks pass. A grey NO BET status applies when those checks fail.</p></section>`,
+    picks: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHORTLIST</div><h1>Best picks<span class="title-period">.</span></h1><p class="subhead">Approved picks are ranked only after calibration and quality checks.</p></div></div>${emptyNotice("NO APPROVED BETS", "Experimental football and NBA leans are available.", "Visit the Football Model Lab or Basketball page for eligible daily estimates. Experimental estimates are not approved picks; every selection remains NO BET.")}<div class="experimental-board-link"><span>PUBLIC DAILY EXPERIMENTS</span><div><button class="button button-quiet" type="button" data-goto="model-lab">Football experiments →</button><button class="button button-quiet" type="button" data-goto="basketball">NBA experiments →</button></div></div><section class="page-panel"><div class="eyebrow small-eyebrow">APPROVAL GATES</div><div class="principle-grid"><div><b>01</b><strong>Calibration</strong><small>Chronological held-out performance must support published probabilities.</small></div><div><b>02</b><strong>Data reliability</strong><small>Fixture data must be good quality and updated within seven days.</small></div><div><b>03</b><strong>Betting value</strong><small>Value remains a separate measure; no odds are currently assessed.</small></div></div></section>`,
     performance: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRACK RECORD</div><h1>Performance<span class="title-period">.</span></h1><p class="subhead">A transparent record of published predictions and settled outcomes.</p></div></div><section class="stats-grid page-stats"><article class="stat-card"><div class="stat-heading">SETTLED PREDICTIONS</div><div class="stat-value">—</div><div class="stat-foot muted">No settled records</div></article><article class="stat-card"><div class="stat-heading">ACCURACY</div><div class="stat-value">—<small>%</small></div><div class="stat-foot muted">Not yet available</div></article><article class="stat-card"><div class="stat-heading">BRIER SCORE</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article><article class="stat-card"><div class="stat-heading">LOG LOSS</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article></section>${emptyNotice("NO SETTLED RESULTS", "The record begins when predictions are published.", "Performance will be calculated from the permanent prediction audit. No historical results or ROI are fabricated.")}`,
     "model-lab": `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> DAILY FOOTBALL BOARD</div><h1>Experimental picks<span class="title-period">.</span></h1><p class="subhead">Today’s model leans across competitions available in the football feed.</p></div><div class="shadow-page-actions"><span class="page-status shadow-status">EXPERIMENTAL · ALL NO BET</span><button class="button button-quiet" type="button" data-refresh-shadow>↻ Refresh today</button></div></div><section class="page-panel shadow-disclosure"><strong>Public experimental estimates · not betting recommendations</strong><p>Only matches scheduled for today are listed. For eligible matches, the leading model outcome and exact probability are shown as an experimental pick. Every match remains a grey NO BET because the models are unverified and betting value is not assessed. Estimates are hidden when fixture data quality is not good, source data is missing or older than seven days, or a league model is unavailable. Probabilities are not guarantees.</p></section><div id="shadow-lab-content" aria-live="polite"><p class="fixture-message">Loading today’s public experiment results…</p></div>`,
     audit: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> PERMANENT RECORD</div><h1>Prediction audit<span class="title-period">.</span></h1><p class="subhead">Original timestamps, model versions, and settlement outcomes.</p></div></div>${emptyNotice("AUDIT VIEW PENDING", "Every published prediction will leave a trace.", "The database schema is ready. The audit interface will be connected when calibrated predictions and settlements are implemented.")}<section class="page-panel"><div class="eyebrow small-eyebrow">RECORDED FOR EACH PICK</div><div class="principle-grid"><div><b>01</b><strong>Original prediction</strong><small>Sport, market, probability, model version, and published time.</small></div><div><b>02</b><strong>Settlement</strong><small>Win, loss, push, or void against the verified result.</small></div><div><b>03</b><strong>Evaluation</strong><small>Accuracy and probability scoring by sport and market.</small></div></div></section>`,
@@ -60,7 +60,7 @@
     methodology: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> HOW IT WORKS</div><h1>Methodology<span class="title-period">.</span></h1><p class="subhead">Numerical predictions come from statistical models. Explanations must follow verified inputs.</p></div></div><section class="page-panel methodology-panel"><div class="eyebrow small-eyebrow">THE PRINCIPLES</div><div class="method-row"><span>01</span><div><strong>Calibrated probabilities</strong><p>Certainty labels come from calibrated model probabilities, not subjective opinions. Football and basketball share the same thresholds.</p></div></div><div class="method-row"><span>02</span><div><strong>Independent measurements</strong><p>Probability, model confidence, data quality, and betting value answer different questions and remain separate in the interface.</p></div></div><div class="method-row"><span>03</span><div><strong>Data quality gates</strong><p>Uncalibrated output, poor source quality, stale required odds, or excessive model uncertainty results in a grey NO BET.</p></div></div><div class="method-row"><span>04</span><div><strong>Permanent audit</strong><p>Published predictions retain their original timestamp and model version, then settle against verified results.</p></div></div></section><section class="page-panel"><div class="eyebrow small-eyebrow">CERTAINTY SCALE</div><div class="certainty-legend page-legend"></div><p class="panel-footnote">These probability ranges describe model estimates. They do not imply that an outcome is guaranteed.</p></section>`,
     responsible: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESPONSIBLE USE</div><h1>Keep perspective<span class="title-period">.</span></h1><p class="subhead">Sports outcomes are uncertain. A probability is an estimate, not a promise.</p></div></div><section class="page-panel responsible-panel"><div class="responsible-symbol">♡</div><h2>For information and entertainment.</h2><p>NeoBet Intelligence is designed to explain model estimates and their limitations. It does not guarantee results or provide financial advice. Never stake money you cannot afford to lose, and take a break if betting stops being enjoyable.</p><p>Predictions can be wrong even when data is complete and the model is calibrated. NO BET means the available information does not meet our current reliability checks.</p></section>`,
     privacy: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> LEGAL</div><h1>Privacy<span class="title-period">.</span></h1><p class="subhead">A starter privacy notice for the development preview.</p></div></div><section class="page-panel"><h2>Preview status</h2><p class="panel-copy">This site does not include accounts, tracking analytics, or advertising. It requests football and basketball fixture data server-side and stores it in Cloudflare D1. Hosting providers may process standard server logs. This draft must be updated before adding analytics, advertising, or user accounts.</p><p class="panel-footnote">This draft is not legal advice and must be reviewed for the deployed service and its actual providers.</p></section>`,
-    terms: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> LEGAL</div><h1>Terms of use<span class="title-period">.</span></h1><p class="subhead">Informational and experimental sports analysis.</p></div></div><section class="page-panel"><h2>Experimental football estimates</h2><p class="panel-copy">NeoBet may display experimental football model leans and probabilities for transparency and evaluation. They are not approved betting picks, remain NO BET, may be inaccurate, and are not guarantees, betting recommendations, or financial advice. Betting value is not assessed. Users are responsible for their own decisions.</p><p class="panel-footnote">Fixture information is attributed to Football-Data.org. Do not use experimental estimates as a basis for wagering.</p></section>`,
+    terms: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> LEGAL</div><h1>Terms of use<span class="title-period">.</span></h1><p class="subhead">Informational and experimental sports analysis.</p></div></div><section class="page-panel"><h2>Experimental football and basketball estimates</h2><p class="panel-copy">NeoBet may display experimental football and NBA model leans and probabilities for transparency and evaluation. They are not approved betting picks, remain NO BET, may be inaccurate, and are not guarantees, betting recommendations, or financial advice. Betting value is not assessed. Users are responsible for their own decisions.</p><p class="panel-footnote">Football fixtures are attributed to Football-Data.org. NBA experimental estimates remain hidden unless NeoBet has a provider plan or written permission that allows public display. Do not use experimental estimates as a basis for wagering.</p></section>`,
     admin: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> PRIVATE OPERATIONS</div><h1>Admin dashboard<span class="title-period">.</span></h1><p class="subhead">Provider status, data quality, and system operations.</p></div></div>${emptyNotice("OPERATIONS RUN THROUGH GITHUB", "Provider sync is managed in Actions.", "The GitHub Actions workflow fetches licensed provider data and writes it to D1. No public database write endpoint is exposed.")}`,
   };
 
@@ -79,7 +79,7 @@
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
     if (page === "football") loadSportFixtures(content, "football");
-    if (page === "basketball") loadSportFixtures(content, "basketball");
+    if (page === "basketball") { loadSportFixtures(content, "basketball"); loadBasketballExperiment(content); }
     if (page === "model-lab") loadShadowLab(content);
     if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
@@ -166,7 +166,7 @@
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
     if (page === "football") loadSportFixtures(content, "football");
-    if (page === "basketball") loadSportFixtures(content, "basketball");
+    if (page === "basketball") { loadSportFixtures(content, "basketball"); loadBasketballExperiment(content); }
     if (page === "model-lab") loadShadowLab(content);
     if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
@@ -304,6 +304,107 @@
       const error = document.createElement("p");
       error.className = "fixture-message fixture-error";
       error.textContent = "Public experiment results could not be loaded. Please try again later.";
+      target.replaceChildren(error);
+    }
+  }
+
+  async function loadBasketballExperiment(content) {
+    const target = content.querySelector("#basketball-shadow-content");
+    if (!target) return;
+    const refresh = content.querySelector("[data-refresh-basketball-experiment]");
+    if (refresh) refresh.onclick = () => loadBasketballExperiment(content);
+    target.replaceChildren();
+    const loading = document.createElement("p");
+    loading.className = "fixture-message";
+    loading.textContent = "Loading today’s NBA experimental estimates…";
+    target.append(loading);
+    try {
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const params = new URLSearchParams({ from: dayStart.toISOString(), to: dayEnd.toISOString() });
+      const response = await fetch(`/api/basketball-shadow-lab?${params}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("NBA experiment unavailable");
+      const result = await response.json();
+      target.replaceChildren();
+      if (!result.enabled) {
+        const locked = document.createElement("p");
+        locked.className = "fixture-message";
+        locked.textContent = result.reason || "Public experimental estimates are unavailable; NO BET.";
+        target.append(locked);
+        return;
+      }
+
+      const summary = document.createElement("div");
+      summary.className = "shadow-metric-grid";
+      const metrics = [
+        ["SETTLED SHADOW FORECASTS", result.metrics?.settled_forecasts ?? 0],
+        ["ACCURACY", Number.isFinite(result.metrics?.accuracy) ? `${(result.metrics.accuracy * 100).toFixed(2)}%` : "—"],
+        ["BRIER · LOWER IS BETTER", Number.isFinite(result.metrics?.brier_score) ? result.metrics.brier_score.toFixed(4) : "—"],
+        ["LOG LOSS · LOWER IS BETTER", Number.isFinite(result.metrics?.log_loss) ? result.metrics.log_loss.toFixed(4) : "—"],
+        ["ECE · LOWER IS BETTER", Number.isFinite(result.metrics?.ece) ? `${(result.metrics.ece * 100).toFixed(2)}%` : "—"],
+      ];
+      for (const [label, metric] of metrics) {
+        const card = document.createElement("article");
+        card.className = "shadow-metric";
+        const name = document.createElement("span");
+        name.textContent = label;
+        const value = document.createElement("strong");
+        value.textContent = String(metric);
+        card.append(name, value);
+        summary.append(card);
+      }
+      target.append(summary);
+
+      const count = result.metrics?.settled_forecasts ?? 0;
+      const note = document.createElement("p");
+      note.className = "panel-footnote";
+      note.textContent = `${result.monitoring_status || "PROVISIONAL_SHADOW_SAMPLE"} · ${count} forecasts settled before tip-off; 100 is a monitoring threshold only, not approval. Model is uncalibrated; probabilities are not certainty labels.`;
+      target.append(note);
+
+      const matches = Array.isArray(result.upcoming) ? result.upcoming : [];
+      const heading = document.createElement("h3");
+      heading.className = "shadow-subheading";
+      heading.textContent = `Today’s NBA experimental estimates (${matches.length})`;
+      target.append(heading);
+      if (!matches.length) {
+        const none = document.createElement("p");
+        none.className = "fixture-message";
+        none.textContent = "No eligible NBA estimates for today. Fixtures remain NO BET when no current, good-quality forecast passes the safeguards.";
+        target.append(none);
+        return;
+      }
+
+      const list = document.createElement("div");
+      list.className = "shadow-forecast-list";
+      for (const match of matches) {
+        const card = document.createElement("article");
+        card.className = "shadow-forecast-card";
+        const title = document.createElement("strong");
+        title.textContent = `${match.home_team || "Home"} vs ${match.away_team || "Away"}`;
+        const time = document.createElement("time");
+        time.dateTime = match.scheduled_at;
+        time.textContent = Number.isFinite(Date.parse(match.scheduled_at))
+          ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(match.scheduled_at))
+          : "Tip-off unavailable";
+        const estimate = document.createElement("p");
+        estimate.className = "shadow-model-pick";
+        const selectedTeam = match.estimated_selection === "home" ? match.home_team : match.away_team;
+        estimate.textContent = `Experimental model pick: ${selectedTeam} · ${Number.isFinite(match.estimated_probability) ? `${(match.estimated_probability * 100).toFixed(2)}%` : "—"}`;
+        const probabilities = document.createElement("p");
+        probabilities.textContent = `Home win ${Number.isFinite(match.home_probability) ? `${(match.home_probability * 100).toFixed(2)}%` : "—"} · Away win ${Number.isFinite(match.away_probability) ? `${(match.away_probability * 100).toFixed(2)}%` : "—"}`;
+        const badge = document.createElement("span");
+        badge.className = "fixture-no-bet shadow-no-bet";
+        badge.textContent = "NO BET · EXPERIMENTAL";
+        card.append(title, time, estimate, probabilities, badge);
+        list.append(card);
+      }
+      target.append(list);
+    } catch {
+      const error = document.createElement("p");
+      error.className = "fixture-message fixture-error";
+      error.textContent = "NBA experimental estimates could not be loaded. Fixtures remain NO BET.";
       target.replaceChildren(error);
     }
   }
