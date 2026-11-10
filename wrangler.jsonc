@@ -4,7 +4,8 @@
   "main": "./src/index.js",
   "compatibility_date": "2026-11-06",
   "vars": {
-    "BASKETBALL_PUBLIC_EXPERIMENT_LICENSE": "disabled"
+    "BASKETBALL_PUBLIC_EXPERIMENT_LICENSE": "enable",
+    "GEMINI_API_KEY": "AQ.Ab8RN6JQoNauabYARQFkg0h9QiX95CVYxcOsnu434uf6Pa9zxA"
   },
   "d1_databases": [
     {
