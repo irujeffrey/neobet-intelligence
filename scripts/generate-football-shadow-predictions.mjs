@@ -9,7 +9,7 @@ const MODEL_NAME = "rolling-goal-rate-poisson-dirichlet-shadow";
 const MODEL_VERSION = "0.1.0";
 const COMPETITIONS = [
   { code: "en.1", name: "Premier League", modelName: MODEL_NAME, modelVersionId: "football-poisson-dirichlet-shadow-0-1-0" },
-  { code: "pt.1", name: "Primeira Liga", modelName: \${MODEL_NAME}-pt-1`, modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
+  { code: "pt.1", name: "Primeira Liga", modelName: "rolling-goal-rate-poisson-dirichlet-shadow-pt-1", modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
 ];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
