@@ -8,6 +8,7 @@
 - Read-only Worker APIs for health, fixtures, sync status, and published predictions.
 - Football fixture cards open a match-analysis view and show grey NO BET while no calibrated public prediction exists.
 - Basketball page reads the existing NBA/WNBA API Ninjas fixtures endpoint and shows upcoming games as responsive cards with league, teams, local kickoff, and grey NO BET status. Cards open the shared match-analysis page.
+- A private GitHub evaluation workflow scores an Elo basketball baseline chronologically from completed NBA/WNBA results already stored in D1. It uses 60% initial dates, 20% validation for temperature calibration, and the final 20% as a prequential holdout; games on the same Eastern Time date do not update ratings until the next date. It reports insufficient history instead of pretending to evaluate a tiny sample, and never publishes picks.
 - Daily successful sports-data sync triggers a GitHub workflow that generates Premier League and Primeira Liga shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
 - Each shadow league fits its own Dirichlet calibration on its latest three complete seasons and stores forecasts under a separate unverified model version.
 - Shadow generation triggers a GitHub review workflow that scores finished forecasts separately by league with accuracy, Brier score, log loss, and calibration bins.
@@ -33,6 +34,7 @@
 
 - Shadow sample size and forward evaluation; other leagues remain excluded until their historical coverage and held-out metrics support a shadow trial.
 - Public calibrated prediction generation, settlement ingestion, and performance dashboards.
+- Basketball cross-season historical evaluation; API Ninjas Free only provides current-season history, so the current report is within-season and exploratory.
 - Confirm each provider account's current quota before increasing the competitions or sync frequency.
 
 All validation and provider sync runs are intended to run on GitHub-hosted runners. No local testing is required.
