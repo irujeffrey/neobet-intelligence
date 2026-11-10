@@ -131,6 +131,140 @@ async function api(request, env, url) {
     }
   }
 
+  if (url.pathname === "/api/basketball-shadow-lab") {
+    if (env.BASKETBALL_PUBLIC_EXPERIMENT_LICENSE !== "approved") {
+      return json({
+        enabled: false,
+        publication_status: "basketball experimental estimates hidden pending confirmation of provider public-display rights",
+        decision: "NO BET",
+        reason: "The current API Ninjas Free-plan terms restrict sharing API output with third parties. Public estimates stay hidden unless a plan or written permission explicitly allows this use.",
+      });
+    }
+    if (!env.DB) return json({ error: "Database is not configured" }, 503);
+
+    const suppliedFrom = url.searchParams.get("from");
+    const suppliedTo = url.searchParams.get("to");
+    const todayParts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const today = Object.fromEntries(todayParts.map((part) => [part.type, part.value]));
+    const lagosStart = Date.UTC(Number(today.year), Number(today.month) - 1, Number(today.day)) - 3600000;
+    const from = suppliedFrom || new Date(lagosStart).toISOString();
+    const to = suppliedTo || new Date(lagosStart + 86400000).toISOString();
+    const fromTime = Date.parse(from);
+    const toTime = Date.parse(to);
+    if (!Number.isFinite(fromTime) || !Number.isFinite(toTime) || toTime <= fromTime ||
+      toTime - fromTime < 22 * 3600000 || toTime - fromTime > 26 * 3600000) {
+      return json({ error: "from and to must define one local calendar day as ISO timestamps" }, 400);
+    }
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const modelId = "basketball-nba-elo-shadow-fixed-0-1-0";
+    try {
+      const [settledResult, upcomingResult] = await Promise.all([
+        env.DB.prepare(`
+          SELECT p.probability, f.home_score, f.away_score
+          FROM predictions AS p
+          JOIN fixtures AS f ON f.id = p.fixture_id
+          JOIN competitions AS competition ON competition.id = f.competition_id
+          WHERE p.model_version_id = ? AND p.sport = 'basketball'
+            AND p.status = 'draft' AND p.decision = 'no_bet' AND p.calibrated = 0
+            AND p.market = 'moneyline' AND p.selection = 'home_win'
+            AND p.probability IS NOT NULL AND f.sport = 'basketball'
+            AND competition.name = 'NBA' AND f.status = 'finished'
+            AND f.home_score IS NOT NULL AND f.away_score IS NOT NULL
+            AND f.home_score <> f.away_score AND f.data_quality = 'good'
+            AND p.created_at < f.scheduled_at
+          ORDER BY f.scheduled_at ASC
+        `).bind(modelId).all(),
+        env.DB.prepare(`
+          SELECT p.fixture_id, p.probability AS home_probability, p.created_at,
+            f.scheduled_at, f.data_quality, f.source_updated_at,
+            competition.name AS competition, home.name AS home_team, away.name AS away_team
+          FROM predictions AS p
+          JOIN fixtures AS f ON f.id = p.fixture_id
+          JOIN competitions AS competition ON competition.id = f.competition_id
+          JOIN teams AS home ON home.id = f.home_team_id
+          JOIN teams AS away ON away.id = f.away_team_id
+          WHERE p.model_version_id = ? AND p.sport = 'basketball'
+            AND p.status = 'draft' AND p.decision = 'no_bet' AND p.calibrated = 0
+            AND p.market = 'moneyline' AND p.selection = 'home_win'
+            AND p.probability IS NOT NULL AND competition.name = 'NBA'
+            AND f.status = 'scheduled' AND f.scheduled_at >= ? AND f.scheduled_at < ?
+            AND f.scheduled_at > ?
+          ORDER BY f.scheduled_at ASC
+          LIMIT 100
+        `).bind(modelId, new Date(fromTime).toISOString(), new Date(toTime).toISOString(), nowIso).all(),
+      ]);
+      const settled = (settledResult.results || []).filter((row) => Number.isFinite(row.probability) &&
+        row.probability >= 0 && row.probability <= 1 && Number.isInteger(row.home_score) &&
+        Number.isInteger(row.away_score));
+      let correct = 0;
+      let brier = 0;
+      let logLoss = 0;
+      const bins = Array.from({ length: 10 }, (_, index) => ({
+        range: `${index * 10}-${(index + 1) * 10}%`, matches: 0, predicted: 0, observed: 0,
+      }));
+      for (const row of settled) {
+        const actual = row.home_score > row.away_score ? 1 : 0;
+        const p = Math.max(1e-12, Math.min(1 - 1e-12, row.probability));
+        if ((p >= 0.5 ? 1 : 0) === actual) correct += 1;
+        brier += (p - actual) ** 2;
+        logLoss -= actual ? Math.log(p) : Math.log(1 - p);
+        const bin = bins[Math.min(9, Math.floor(p * 10))];
+        bin.matches += 1; bin.predicted += p; bin.observed += actual;
+      }
+      let ece = 0;
+      for (const bin of bins) {
+        if (!bin.matches) continue;
+        bin.mean_predicted = bin.predicted / bin.matches;
+        bin.observed_frequency = bin.observed / bin.matches;
+        ece += bin.matches / settled.length * Math.abs(bin.mean_predicted - bin.observed_frequency);
+        delete bin.predicted; delete bin.observed;
+      }
+      const upcoming = (upcomingResult.results || []).map((row) => {
+        const sourceUpdated = Date.parse(row.source_updated_at || "");
+        const sourceFresh = Number.isFinite(sourceUpdated) && sourceUpdated <= now && now - sourceUpdated <= 7 * 86400000;
+        const created = Date.parse(row.created_at || "");
+        const kickoff = Date.parse(row.scheduled_at || "");
+        const eligible = row.data_quality === "good" && sourceFresh && Number.isFinite(created) &&
+          Number.isFinite(kickoff) && created < kickoff - 30 * 60000 && kickoff > now + 30 * 60000 &&
+          Number.isFinite(row.home_probability) && row.home_probability >= 0 && row.home_probability <= 1;
+        const probability = eligible ? (row.home_probability >= 0.5 ? row.home_probability : 1 - row.home_probability) : null;
+        return {
+          fixture_id: row.fixture_id, competition: row.competition, scheduled_at: row.scheduled_at,
+          home_team: row.home_team, away_team: row.away_team,
+          estimated_selection: eligible ? (row.home_probability >= 0.5 ? "home" : "away") : null,
+          estimated_probability: probability,
+          home_probability: eligible ? row.home_probability : null,
+          away_probability: eligible ? 1 - row.home_probability : null,
+          decision: "NO BET", calibrated: false, eligible,
+          reason: eligible ? "Experimental score-history estimate only; uncalibrated and no betting value assessed. NO BET." :
+            row.data_quality !== "good" ? "Fixture data quality is insufficient; NO BET." :
+              !sourceFresh ? "Fixture source data is missing or more than seven days old; NO BET." :
+                "No eligible pre-tip estimate is available; NO BET.",
+        };
+      });
+      return json({
+        enabled: true,
+        generated_at: new Date().toISOString(), day_from: from, day_to: to,
+        publication_status: "public experimental NBA model leans; every selection remains NO BET",
+        model: { name: "NBA Elo fixed-reference shadow", version: "0.1.0", calibrated: false },
+        safeguards: { all_rows_no_bet: true, requires_good_data_quality: true, max_source_age_days: 7,
+          requires_30_minutes_before_tip: true, approved_for_betting: false },
+        metrics: settled.length ? { settled_forecasts: settled.length, accuracy: correct / settled.length,
+          brier_score: brier / settled.length, log_loss: logLoss / settled.length, ece,
+          calibration_bins: bins.filter((bin) => bin.matches) } :
+          { settled_forecasts: 0, accuracy: null, brier_score: null, log_loss: null, ece: null, calibration_bins: [] },
+        monitoring_status: settled.length < 100 ? "PROVISIONAL_SHADOW_SAMPLE" : "ONGOING_SHADOW_MONITORING",
+        monitoring_threshold: 100,
+        upcoming: upcoming.filter((row) => row.eligible),
+      });
+    } catch {
+      return json({ error: "Basketball experiment results are temporarily unavailable" }, 503);
+    }
+  }
+
   if (url.pathname === "/api/shadow-lab") {
     if (!env.DB) return json({ error: "Database is not configured" }, 503);
     const modelProfiles = [
