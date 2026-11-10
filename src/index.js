@@ -135,8 +135,28 @@ async function api(request, env, url) {
     if (!env.DB) return json({ error: "Database is not configured" }, 503);
     const modelProfiles = [
       { id: "football-poisson-dirichlet-shadow-0-1-0", competition: "Premier League" },
+      { id: "football-poisson-dirichlet-shadow-en-2-0-1-0", competition: "Championship" },
       { id: "football-poisson-dirichlet-shadow-pt-1-0-1-0", competition: "Primeira Liga" },
+      { id: "football-poisson-dirichlet-shadow-it-1-0-1-0", competition: "Serie A" },
+      { id: "football-poisson-dirichlet-shadow-br-1-0-1-0", competition: "Campeonato Brasileiro Série A" },
     ];
+    const suppliedFrom = url.searchParams.get("from");
+    const suppliedTo = url.searchParams.get("to");
+    const todayParts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const today = Object.fromEntries(todayParts.map((part) => [part.type, part.value]));
+    const lagosStart = Date.UTC(Number(today.year), Number(today.month) - 1, Number(today.day)) - 3600000;
+    const from = suppliedFrom || new Date(lagosStart).toISOString();
+    const to = suppliedTo || new Date(lagosStart + 86400000).toISOString();
+    const fromTime = Date.parse(from);
+    const toTime = Date.parse(to);
+    if (!Number.isFinite(fromTime) || !Number.isFinite(toTime) || toTime <= fromTime ||
+      toTime - fromTime < 22 * 3600000 || toTime - fromTime > 26 * 3600000) {
+      return json({ error: "from and to must define one local calendar day as ISO timestamps" }, 400);
+    }
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
     try {
       const ids = modelProfiles.map((profile) => `'${profile.id}'`).join(",");
       const result = await env.DB.prepare(`
@@ -154,6 +174,18 @@ async function api(request, env, url) {
         ORDER BY f.scheduled_at DESC
         LIMIT 6000
       `).all();
+      const dailyFixtures = await env.DB.prepare(`
+        SELECT f.id AS fixture_id, f.scheduled_at, f.data_quality,
+          competition.name AS competition, home.name AS home_team, away.name AS away_team
+        FROM fixtures AS f
+        LEFT JOIN competitions AS competition ON competition.id = f.competition_id
+        JOIN teams AS home ON home.id = f.home_team_id
+        JOIN teams AS away ON away.id = f.away_team_id
+        WHERE f.sport = 'football' AND f.status = 'scheduled'
+          AND f.scheduled_at >= ? AND f.scheduled_at < ? AND f.scheduled_at > ?
+          AND competition.name IS NOT NULL
+        ORDER BY f.scheduled_at ASC LIMIT 500
+      `).bind(from, to, nowIso).all();
       const rows = result.results || [];
       const groups = new Map();
       for (const row of rows) {
@@ -169,7 +201,6 @@ async function api(request, env, url) {
         });
         groups.get(key).probabilities[row.selection] = row.probability;
       }
-      const now = Date.now();
       const complete = [...groups.values()].filter((match) => {
         const outcomes = ["home", "draw", "away"];
         if (outcomes.some((outcome) => !Number.isFinite(match.probabilities[outcome]))) return false;
@@ -216,24 +247,47 @@ async function api(request, env, url) {
         const profileMatches = complete.filter((match) => match.model_version_id === profile.id);
         const settled = profileMatches.filter((match) => match.status === "finished" &&
           Number.isInteger(match.home_score) && Number.isInteger(match.away_score));
-        const upcoming = profileMatches.filter((match) => match.status === "scheduled" && Date.parse(match.scheduled_at) > now)
-          .sort((a, b) => Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at));
-        const recentSettled = [...settled].sort((a, b) => Date.parse(b.scheduled_at) - Date.parse(a.scheduled_at)).slice(0, 60)
-          .map(({ fixture_id, scheduled_at, home_team, away_team, home_score, away_score, probabilities }) => ({
-            fixture_id, scheduled_at, home_team, away_team, home_score, away_score, probabilities,
-            actual: home_score > away_score ? "home" : home_score === away_score ? "draw" : "away",
-          }));
+        const forecastByFixture = new Map(profileMatches
+          .filter((match) => match.status === "scheduled" && Date.parse(match.scheduled_at) > now)
+          .map((match) => [match.fixture_id, match]));
+        const upcoming = (dailyFixtures.results || []).filter((fixture) => fixture.competition === profile.competition)
+          .map((fixture) => {
+            const forecast = forecastByFixture.get(fixture.fixture_id);
+            return {
+              fixture_id: fixture.fixture_id, scheduled_at: fixture.scheduled_at,
+              home_team: fixture.home_team, away_team: fixture.away_team,
+              data_quality: fixture.data_quality, probabilities: forecast?.probabilities || null,
+              decision: "NO BET",
+              reason: forecast ? "Public experimental estimate only; no approved pick." : "No eligible league model estimate is available; NO BET.",
+            };
+          });
         return {
           competition: profile.competition,
-          model_status: "unverified shadow experiment; not approved for public picks",
+          model_status: profileMatches.length
+            ? "unverified shadow experiment; not approved for public picks"
+            : "no eligible shadow model forecast; NO BET",
           metrics: score(settled),
-          upcoming: upcoming.slice(0, 30).map(({ fixture_id, scheduled_at, home_team, away_team, probabilities }) => ({
-            fixture_id, scheduled_at, home_team, away_team, probabilities, decision: "NO BET",
-          })),
-          recent_settled: recentSettled,
+          upcoming: upcoming.slice(0, 30),
         };
       });
-      return json({ generated_at: new Date().toISOString(), publication_status: "public experimental results; no approved picks", leagues });
+      const knownCompetitions = new Set(modelProfiles.map((profile) => profile.competition));
+      const additionalCompetitions = new Map();
+      for (const fixture of dailyFixtures.results || []) {
+        if (!fixture.competition || knownCompetitions.has(fixture.competition)) continue;
+        if (!additionalCompetitions.has(fixture.competition)) additionalCompetitions.set(fixture.competition, []);
+        additionalCompetitions.get(fixture.competition).push({
+          fixture_id: fixture.fixture_id, scheduled_at: fixture.scheduled_at,
+          home_team: fixture.home_team, away_team: fixture.away_team,
+          data_quality: fixture.data_quality, probabilities: null, decision: "NO BET",
+          reason: "No eligible league model estimate is available; NO BET.",
+        });
+      }
+      for (const [competition, upcoming] of additionalCompetitions) {
+        leagues.push({ competition, model_status: "no eligible shadow model forecast; NO BET",
+          metrics: score([]), upcoming });
+      }
+      return json({ generated_at: new Date().toISOString(), day_from: from, day_to: to,
+        publication_status: "public experimental results; no approved picks", leagues });
     } catch {
       return json({ error: "Shadow experiment results are temporarily unavailable" }, 503);
     }
