@@ -3,12 +3,16 @@ import path from "node:path";
 
 const DATASET_SEASONS = ["2022-23", "2023-24", "2024-25", "2025-26"];
 const TRAIN_SEASONS = new Set(["2022-23", "2023-24"]);
+const PARAMETER_SELECTION_SEASON = "2023-24";
 const VALIDATION_SEASON = "2024-25";
 const TEST_SEASON = "2025-26";
-const ELO_K = 20;
-const HOME_ADVANTAGE_ELO = 65;
 const ELO_SCALE = 400;
-const SEASON_CARRYOVER = 0.75;
+const PARAMETER_GRID = {
+  k_factor: [10, 15, 20, 25, 30, 35],
+  home_advantage_elo: [0, 35, 50, 65, 80, 100],
+  season_carryover: [0.5, 0.65, 0.75, 0.85, 1.0],
+};
+const FIXED_REFERENCE = { k_factor: 20, home_advantage_elo: 65, season_carryover: 0.75 };
 const MIN_TRAIN_GAMES = 1000;
 const MIN_VALIDATION_GAMES = 500;
 const MIN_TEST_GAMES = 500;
@@ -25,8 +29,8 @@ function logit(probability) {
   return Math.log(bounded / (1 - bounded));
 }
 
-function expectedHome(homeRating, awayRating) {
-  return sigmoid(Math.LN10 * (homeRating - awayRating + HOME_ADVANTAGE_ELO) / ELO_SCALE);
+function expectedHome(homeRating, awayRating, parameters) {
+  return sigmoid(Math.LN10 * (homeRating - awayRating + parameters.home_advantage_elo) / ELO_SCALE);
 }
 
 function parseCsv(text) {
@@ -170,11 +174,11 @@ async function downloadSeason(season) {
   return games.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
 
-function carryRatings(ratings) {
-  for (const [team, rating] of ratings) ratings.set(team, 1500 + (rating - 1500) * SEASON_CARRYOVER);
+function carryRatings(ratings, parameters) {
+  for (const [team, rating] of ratings) ratings.set(team, 1500 + (rating - 1500) * parameters.season_carryover);
 }
 
-function predictAndUpdate(games, ratings) {
+function predictAndUpdate(games, ratings, parameters) {
   const byDate = new Map();
   for (const game of games) {
     if (!byDate.has(game.date)) byDate.set(game.date, []);
@@ -185,13 +189,13 @@ function predictAndUpdate(games, ratings) {
     const day = dateGames.map((game) => {
       const homeRating = ratings.get(game.home_team) ?? 1500;
       const awayRating = ratings.get(game.away_team) ?? 1500;
-      return { game, probability: expectedHome(homeRating, awayRating), homeRating, awayRating };
+      return { game, probability: expectedHome(homeRating, awayRating, parameters), homeRating, awayRating };
     });
     predictions.push(...day);
     const deltas = new Map();
     for (const item of day) {
       const actual = item.game.home_score > item.game.away_score ? 1 : 0;
-      const delta = ELO_K * (actual - item.probability);
+      const delta = parameters.k_factor * (actual - item.probability);
       deltas.set(item.game.home_team, (deltas.get(item.game.home_team) || 0) + delta);
       deltas.set(item.game.away_team, (deltas.get(item.game.away_team) || 0) - delta);
     }
@@ -252,21 +256,45 @@ function addActual(predictions) {
 function pct(value) { return value == null ? "—" : `${(value * 100).toFixed(2)}%`; }
 function num(value) { return value == null ? "—" : value.toFixed(4); }
 
+function runSeasons(seasons, parameters) {
+  const ratings = new Map();
+  const predictions = new Map();
+  for (const season of DATASET_SEASONS) {
+    if (season !== DATASET_SEASONS[0]) carryRatings(ratings, parameters);
+    predictions.set(season, addActual(predictAndUpdate(seasons.get(season), ratings, parameters)));
+  }
+  return predictions;
+}
+
+function selectParameters(seasons) {
+  let best = null;
+  const selectionGames = seasons.get(PARAMETER_SELECTION_SEASON);
+  for (const kFactor of PARAMETER_GRID.k_factor) {
+    for (const homeAdvantage of PARAMETER_GRID.home_advantage_elo) {
+      for (const carryover of PARAMETER_GRID.season_carryover) {
+        const parameters = { k_factor: kFactor, home_advantage_elo: homeAdvantage, season_carryover: carryover };
+        const ratings = new Map();
+        predictAndUpdate(seasons.get("2022-23"), ratings, parameters);
+        carryRatings(ratings, parameters);
+        const selection = addActual(predictAndUpdate(selectionGames, ratings, parameters));
+        const result = metrics(selection);
+        if (!best || result.log_loss < best.metrics.log_loss) best = { parameters, metrics: result };
+      }
+    }
+  }
+  return best;
+}
+
 async function main() {
   const seasons = new Map();
   for (const season of DATASET_SEASONS) seasons.set(season, await downloadSeason(season));
 
-  const ratings = new Map();
-  let train = [];
-  let validation = [];
-  let test = [];
-  for (const season of DATASET_SEASONS) {
-    if (season !== DATASET_SEASONS[0]) carryRatings(ratings);
-    const predictions = predictAndUpdate(seasons.get(season), ratings);
-    if (TRAIN_SEASONS.has(season)) train.push(...addActual(predictions));
-    else if (season === VALIDATION_SEASON) validation = addActual(predictions);
-    else if (season === TEST_SEASON) test = addActual(predictions);
-  }
+  const selection = selectParameters(seasons);
+  const tuned = runSeasons(seasons, selection.parameters);
+  const fixed = runSeasons(seasons, FIXED_REFERENCE);
+  const train = [...TRAIN_SEASONS].flatMap((season) => tuned.get(season));
+  const validation = tuned.get(VALIDATION_SEASON);
+  const test = tuned.get(TEST_SEASON);
   if (train.length < MIN_TRAIN_GAMES || validation.length < MIN_VALIDATION_GAMES || test.length < MIN_TEST_GAMES) {
     throw new Error(`Cross-season evaluation blocked by insufficient paired games: training=${train.length}, validation=${validation.length}, test=${test.length}. Required ${MIN_TRAIN_GAMES}/${MIN_VALIDATION_GAMES}/${MIN_TEST_GAMES}.`);
   }
@@ -275,18 +303,20 @@ async function main() {
   const pretest = [...train, ...validation];
   const homeRate = pretest.filter((item) => item.actual === 1).length / pretest.length;
   const metricsByMethod = {
-    raw_elo: metrics(test),
-    temperature_scaled_elo: metrics(test, (p) => sigmoid(logit(p) / temperature)),
+    tuned_raw_elo: metrics(test),
+    tuned_temperature_scaled_elo: metrics(test, (p) => sigmoid(logit(p) / temperature)),
+    fixed_reference_raw_elo: metrics(fixed.get(TEST_SEASON)),
     pretest_home_win_rate_baseline: metrics(test.map((item) => ({ ...item, probability: homeRate }))),
   };
   const report = {
     generated_at: new Date().toISOString(),
     source: { name: "BoxScore Lab NBA team game results", url: "https://www.boxscorelab.com/downloads/", license: "CC BY 4.0", attribution: `BoxScore Lab, boxscorelab.com; data downloaded ${new Date().toISOString().slice(0, 10)}. Statistics originate from NBA Stats. BoxScore Lab is not affiliated with the NBA.`, rows_are_team_game_rows: true },
-    evaluation_type: "cross-season chronological prequential evaluation; results from each date update team ratings only for later dates; ratings regress toward league average between seasons",
+    evaluation_type: "cross-season chronological prequential evaluation; Elo parameters selected only on 2023-24 after 2022-23 warm-up; temperature calibrated only on 2024-25; 2025-26 remains untouched; results from each date update ratings only for later dates",
     seasons: { training: [...TRAIN_SEASONS], calibration_validation: VALIDATION_SEASON, final_untouched_test: TEST_SEASON, excluded_ongoing_season: "2026-27" },
-    game_counts: { training: train.length, calibration_validation: validation.length, final_untouched_test: test.length, paired_games_by_season: Object.fromEntries([...seasons].map(([season, games]) => [season, games.length])) },
-    model: { name: "NBA Elo home-win probability baseline", k_factor: ELO_K, home_advantage_elo: HOME_ADVANTAGE_ELO, season_carryover: SEASON_CARRYOVER, temperature_fitted_only_on: VALIDATION_SEASON, fitted_temperature: temperature, baseline_home_win_rate_fitted_before_test: homeRate },
-    validation_metrics: { raw_elo_log_loss: logLoss(validation), temperature_scaled_elo_log_loss: logLoss(validation, (p) => sigmoid(logit(p) / temperature)) },
+    game_counts: { parameter_selection: selection.metrics.games, training: train.length, calibration_validation: validation.length, final_untouched_test: test.length, paired_games_by_season: Object.fromEntries([...seasons].map(([season, games]) => [season, games.length])) },
+    parameter_selection: { season: PARAMETER_SELECTION_SEASON, warmup_season: "2022-23", objective: "lowest log loss", candidates_evaluated: PARAMETER_GRID.k_factor.length * PARAMETER_GRID.home_advantage_elo.length * PARAMETER_GRID.season_carryover.length, selected: selection.parameters, selected_season_metrics: selection.metrics, fixed_reference: FIXED_REFERENCE },
+    model: { name: "NBA Elo home-win probability baseline", ...selection.parameters, temperature_fitted_only_on: VALIDATION_SEASON, fitted_temperature: temperature, baseline_home_win_rate_fitted_before_test: homeRate },
+    validation_metrics: { tuned_raw_elo_log_loss: logLoss(validation), tuned_temperature_scaled_elo_log_loss: logLoss(validation, (p) => sigmoid(logit(p) / temperature)) },
     held_out_test_metrics: metricsByMethod,
     public_status: "evaluation only; no basketball probabilities or picks approved for publication; keep NO BET safeguards",
     limitations: ["This is a score-history Elo baseline, not a production model and not evidence of betting value.", "The final test is one complete past NBA season; results may not transfer to future seasons.", "WNBA is not included because the licensed historical data source used here covers NBA only.", "BoxScore Lab republishes nightly during the season; reports must be interpreted with the retrieval date and source attribution."],
@@ -298,15 +328,16 @@ async function main() {
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     const methods = [
-      ["Raw Elo", metricsByMethod.raw_elo],
-      ["Temperature-scaled Elo", metricsByMethod.temperature_scaled_elo],
+      ["Tuned raw Elo", metricsByMethod.tuned_raw_elo],
+      ["Tuned temperature-scaled Elo", metricsByMethod.tuned_temperature_scaled_elo],
+      ["Fixed Elo reference", metricsByMethod.fixed_reference_raw_elo],
       ["Pre-test home-win-rate baseline", metricsByMethod.pretest_home_win_rate_baseline],
     ];
     const lines = [
       "# NeoBet NBA cross-season evaluation", "",
       `- Data: [BoxScore Lab NBA team game results](${report.source.url}), CC BY 4.0. Attribution: ${report.source.attribution}`,
-      `- Training seasons: ${[...TRAIN_SEASONS].join(", ")} (${train.length} games)`,
-      `- Calibration season: ${VALIDATION_SEASON} (${validation.length} games); temperature fitted only here: ${temperature.toFixed(4)}`,
+      `- Parameter selection: ${PARAMETER_SELECTION_SEASON}, after 2022-23 warm-up; ${report.parameter_selection.candidates_evaluated} combinations compared; selected K=${selection.parameters.k_factor}, home advantage=${selection.parameters.home_advantage_elo}, season carryover=${selection.parameters.season_carryover}.`,
+      `- Temperature calibration: ${VALIDATION_SEASON} (${validation.length} games); temperature fitted only here: ${temperature.toFixed(4)}`,
       `- Untouched final test: ${TEST_SEASON} (${test.length} games)`,
       "- Ongoing 2026-27 excluded. Predictions are prequential; same-date games do not update ratings until the next date.",
       "- Public status: evaluation only. Do not publish these as approved picks; basketball remains NO BET.", "",
