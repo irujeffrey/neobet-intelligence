@@ -471,6 +471,115 @@ async function api(request, env, url) {
   return json({ error: "Not found" }, 404);
 }
 
+
+
+  if (url.pathname === "/api/gemini-analysis") {
+    if (!env.DB) {
+      return json({ error: "Database is not configured" }, 503);
+    }
+
+    const fixtureId = url.searchParams.get("fixture_id");
+
+    if (!fixtureId || fixtureId.length > 100) {
+      return json({ error: "A valid fixture_id is required" }, 400);
+    }
+
+    try {
+      const fixture = await env.DB.prepare(`
+        SELECT
+          f.id, f.sport, f.scheduled_at, f.status,
+          f.data_quality, f.source_updated_at,
+          competition.name AS competition,
+          home.name AS home_team,
+          away.name AS away_team
+        FROM fixtures AS f
+        LEFT JOIN competitions AS competition
+          ON competition.id = f.competition_id
+        JOIN teams AS home ON home.id = f.home_team_id
+        JOIN teams AS away ON away.id = f.away_team_id
+        WHERE f.id = ?
+        LIMIT 1
+      `).bind(fixtureId).first();
+
+      if (!fixture) {
+        return json({ error: "Fixture not found" }, 404);
+      }
+
+      if (fixture.sport !== "football") {
+        return json({ error: "This endpoint currently supports football only" }, 400);
+      }
+
+      if (
+        fixture.status !== "scheduled" ||
+        !Number.isFinite(Date.parse(fixture.scheduled_at)) ||
+        Date.parse(fixture.scheduled_at) <= Date.now()
+      ) {
+        return json({ error: "Only upcoming scheduled fixtures can be analysed" }, 409);
+      }
+
+      const analysis = await runGeminiAnalysis(env, fixture);
+
+      return json({
+        ok: true,
+        provider: "Google Gemini",
+        mode: "independent_research_only",
+        calibrated: false,
+        betting_approval: false,
+        fixture,
+        analysis
+      });
+
+    } catch {
+      return json({
+        error: "Gemini analysis is temporarily unavailable"
+      }, 502);
+    }
+  }
+
+async function runGeminiAnalysis(env, matchData) {
+  const apiKey = env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Gemini API key is not configured.");
+  }
+
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey
+      },
+      body: JSON.stringify({
+        contents: [{
+          role: "user",
+          parts: [{
+            text: `Independently analyse this football match using only the supplied data.
+Do not invent statistics or odds.
+Return a cautious assessment, likely 1X2 outcome (Home, Draw, or Away), supporting evidence, uncertainties, and whether the evidence is insufficient.
+
+Match data:
+${JSON.stringify(matchData)}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: "application/json"
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini API error: ${response.status}`);
+  }
+
+  const result = await response.json();
+
+  return result.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
