@@ -9,7 +9,10 @@ const MODEL_NAME = "rolling-goal-rate-poisson-dirichlet-shadow";
 const MODEL_VERSION = "0.1.0";
 const COMPETITIONS = [
   { code: "en.1", name: "Premier League", modelName: MODEL_NAME, modelVersionId: "football-poisson-dirichlet-shadow-0-1-0" },
-  { code: "pt.1", name: "Primeira Liga", modelName: "rolling-goal-rate-poisson-dirichlet-shadow-pt-1", modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
+  { code: "en.2", name: "Championship", modelName: `${MODEL_NAME}-en-2`, modelVersionId: "football-poisson-dirichlet-shadow-en-2-0-1-0" },
+  { code: "pt.1", name: "Primeira Liga", modelName: `${MODEL_NAME}-pt-1`, modelVersionId: "football-poisson-dirichlet-shadow-pt-1-0-1-0" },
+  { code: "it.1", name: "Serie A", modelName: `${MODEL_NAME}-it-1`, modelVersionId: "football-poisson-dirichlet-shadow-it-1-0-1-0" },
+  { code: "br.1", name: "Campeonato Brasileiro Série A", modelName: `${MODEL_NAME}-br-1`, modelVersionId: "football-poisson-dirichlet-shadow-br-1-0-1-0" },
 ];
 const OUTCOMES = ["home", "draw", "away"];
 const HALF_LIFE_DAYS = 730;
@@ -266,7 +269,7 @@ function insertPrediction(row) {
     ${sql(row.selection)}, 'no_bet', ${row.probability.toFixed(10)}, 0, NULL, NULL,
     ${sql(row.data_quality)}, NULL, 0, NULL,
     'Shadow estimate only; model calibration is not approved for publication.',
-     ${sql(row.explanation)}, ${sql(row.model_name)}, ${sql(MODEL_VERSION)}, 'draft', NULL
+    ${sql(row.explanation)}, ${sql(row.model_name)}, ${sql(MODEL_VERSION)}, 'draft', NULL
   );`;
 }
 
@@ -286,16 +289,18 @@ async function main() {
     const rows = validHistory.filter((row) => row.competition_code === competition.code);
     const seasons = completedSeasons(rows);
     const calibrationSeasons = seasons.slice(-3);
-    if (calibrationSeasons.length !== 3 || calibrationSeasons.some((season, index) =>
-      index > 0 && seasonStart(season) - seasonStart(calibrationSeasons[index - 1]) !== 1)) {
-      throw new Error(`${competition.name} needs three consecutive complete historical seasons for shadow-only calibration; found ${seasons.join(", ") || "none"}.`);
-    }
+    const hasConsecutiveSeasons = calibrationSeasons.length === 3 && !calibrationSeasons.some((season, index) =>
+      index > 0 && seasonStart(season) - seasonStart(calibrationSeasons[index - 1]) !== 1);
+    if (!hasConsecutiveSeasons) return { ...competition, rows, seasons: calibrationSeasons, available: false,
+      unavailable_reason: `Three consecutive complete seasons are unavailable; complete seasons found: ${seasons.join(", ") || "none"}.` };
     const calibrationRows = rows.filter((row) => calibrationSeasons.includes(row.season));
     const calibrationPredictions = calibrationRows.map((match) => ({
       probabilities: rawProbabilities(match, weightedStats(rows, match.match_date)),
       actual: mainOutcome(match),
     }));
-    return { ...competition, rows, seasons: calibrationSeasons, calibrationPredictions,
+    if (calibrationPredictions.length < 300) return { ...competition, rows, seasons: calibrationSeasons, available: false,
+      unavailable_reason: `Only ${calibrationPredictions.length} chronological calibration predictions are available; at least 300 are required.` };
+    return { ...competition, rows, seasons: calibrationSeasons, calibrationPredictions, available: true,
       trainingDataStart: calibrationRows.map((row) => row.match_date).sort()[0],
       trainingDataEnd: calibrationRows.map((row) => row.match_date).sort().at(-1),
       dirichlet: fitDirichlet(calibrationPredictions) };
@@ -315,22 +320,22 @@ async function main() {
       AND competition.name IN (${COMPETITIONS.map(({ name }) => sql(name)).join(",")})
       AND f.scheduled_at >= ${sql(start)} AND f.scheduled_at < ${sql(end)}
     ORDER BY f.scheduled_at ASC
-    LIMIT 100
+    LIMIT 500
   `);
 
-  const sqlStatements = profiles.map((profile) => `INSERT OR IGNORE INTO model_versions (
+  const availableProfiles = profiles.filter((profile) => profile.available);
+  const sqlStatements = availableProfiles.map((profile) => `INSERT OR IGNORE INTO model_versions (
       id, sport, model_name, version, calibration_method, calibration_status,
       training_data_start, training_data_end
     ) VALUES (
-        ${sql(profile.modelVersionId)}, 'football', ${sql(profile.modelName)}, ${sql(MODEL_VERSION)},
+      ${sql(profile.modelVersionId)}, 'football', ${sql(profile.modelName)}, ${sql(MODEL_VERSION)},
       ${sql(`L2-regularized Dirichlet; shadow-only; ${profile.code}`)}, 'unverified',
-
       ${sql(profile.trainingDataStart)}, ${sql(profile.trainingDataEnd)}
     );`);
   let preparedPredictions = 0;
   for (const fixture of fixtures) {
     const profile = profiles.find((entry) => entry.name === fixture.competition);
-    if (!profile) continue;
+    if (!profile?.available) continue;
     const targetDate = String(fixture.scheduled_at).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) continue;
     const stats = weightedStats(profile.rows, targetDate);
@@ -343,7 +348,8 @@ async function main() {
     for (let index = 0; index < OUTCOMES.length; index += 1) {
       sqlStatements.push(insertPrediction({
         fixture_id: fixture.fixture_id,
-         model_name: profile.modelName,
+        model_version_id: profile.modelVersionId,
+        model_name: profile.modelName,
         selection: OUTCOMES[index],
         probability: probabilities[index],
         data_quality: bothTeamsKnown ? dataQuality : "fair",
@@ -366,7 +372,9 @@ async function main() {
       competition_code: profile.code,
       model_version_id: profile.modelVersionId,
       calibration_seasons: profile.seasons,
-      calibration_matches: profile.calibrationPredictions.length,
+      calibration_matches: profile.calibrationPredictions?.length || 0,
+      model_available: profile.available,
+      unavailable_reason: profile.unavailable_reason || null,
       upcoming_fixtures: fixtures.filter((fixture) => fixture.competition === profile.name).length,
     })),
     draft_no_bet_prediction_rows_prepared: preparedPredictions,
@@ -379,7 +387,7 @@ async function main() {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
       `# Football shadow forecast run\n\n` +
       `- Model: ${MODEL_NAME} v${MODEL_VERSION} (${summary.model_status})\n` +
-      profiles.map((profile) => `- ${profile.name}: ${profile.calibrationPredictions.length} calibration matches from ${profile.seasons.join(", ")}; ${fixtures.filter((fixture) => fixture.competition === profile.name).length} upcoming fixtures`).join("\n") + "\n" +
+      profiles.map((profile) => `- ${profile.name}: ${profile.available ? `${profile.calibrationPredictions.length} calibration matches from ${profile.seasons.join(", ")}; ${fixtures.filter((fixture) => fixture.competition === profile.name).length} upcoming fixtures` : `NO BET — ${profile.unavailable_reason}`}`).join("\n") + "\n" +
       `- Draft NO BET outcome rows prepared: ${preparedPredictions}\n\n` +
       `These records remain unpublished; no probabilities are presented as production-calibrated.\n`,
     );

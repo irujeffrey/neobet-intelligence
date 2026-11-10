@@ -6,7 +6,10 @@ const DATABASE_ID = requireEnv("CLOUDFLARE_D1_DATABASE_ID");
 const API_TOKEN = requireEnv("CLOUDFLARE_API_TOKEN");
 const MODEL_VERSION_IDS = [
   "football-poisson-dirichlet-shadow-0-1-0",
+  "football-poisson-dirichlet-shadow-en-2-0-1-0",
   "football-poisson-dirichlet-shadow-pt-1-0-1-0",
+  "football-poisson-dirichlet-shadow-it-1-0-1-0",
+  "football-poisson-dirichlet-shadow-br-1-0-1-0",
 ];
 const OUTCOMES = ["home", "draw", "away"];
 const MIN_SHADOW_MATCHES = 100;
