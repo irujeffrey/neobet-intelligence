@@ -5,7 +5,7 @@
   "compatibility_date": "2026-11-06",
   "vars": {
     "BASKETBALL_PUBLIC_EXPERIMENT_LICENSE": "enable",
-    "GEMINI_API_KEY": "AIzaSyBwO7IRATSErwUeUSj-WznBdhCf6R1ZjaQ"
+
   },
   "d1_databases": [
     {
