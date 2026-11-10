@@ -2,6 +2,9 @@ name: Evaluate NeoBet football baseline
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Import NeoBet football history"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -9,6 +12,7 @@ permissions:
 jobs:
   evaluate:
     name: Evaluate chronological Premier League holdouts
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
