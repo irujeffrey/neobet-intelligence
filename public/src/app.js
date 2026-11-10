@@ -50,8 +50,8 @@
   let selectedFixture = null;
   const emptyNotice = (label, title, body) => `<div class="page-empty"><div class="page-empty-mark">✳</div><div><div class="empty-label"><span></span> ${label}</div><h3>${title}</h3><p>${body}</p></div></div>`;
   const pageMarkup = {
-    football: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Football<span class="title-period">.</span></h1><p class="subhead">Upcoming fixtures from Football-Data.org, shown in your local time.</p></div><span class="page-status">● FOOTBALL-DATA.ORG FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-football>↻ Refresh</button></div><div class="football-fixture-list" id="football-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming football fixtures…</p></div></section><section class="page-panel shadow-disclosure"><strong>Today’s public experimental football picks</strong><p>Open the daily board for experimental model leans across today’s competitions. These are not approved bets: every selection remains NO BET, and estimates are hidden when data or model checks fail.</p><button class="button button-quiet" type="button" data-goto="model-lab">View today’s experimental picks →</button></section><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
-    basketball: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Basketball<span class="title-period">.</span></h1><p class="subhead">Team strength, pace-aware projections, and transparent match analysis.</p></div><span class="page-status">● API NINJAS FEED</span></div>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixture data and predictions are separate.", "Run the GitHub sports-data sync to load NBA/WNBA schedules and results. Picks appear after a calibrated basketball model passes quality checks. Use the fixture feed link below to review imported data.")}<p class="panel-footnote"><a href="/api/fixtures?sport=basketball">Open basketball fixture data</a></p><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
+    football: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Football<span class="title-period">.</span></h1><p class="subhead">Upcoming fixtures from Football-Data.org, shown in your local time.</p></div><span class="page-status">● FOOTBALL-DATA.ORG FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-football>↻ Refresh</button></div><div class="sports-fixture-list" id="football-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming football fixtures…</p></div></section><section class="page-panel shadow-disclosure"><strong>Today’s public experimental football picks</strong><p>Open the daily board for experimental model leans across today’s competitions. These are not approved bets: every selection remains NO BET, and estimates are hidden when data or model checks fail.</p><button class="button button-quiet" type="button" data-goto="model-lab">View today’s experimental picks →</button></section><section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
+    basketball: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SPORT CENTRE</div><h1>Basketball<span class="title-period">.</span></h1><p class="subhead">Upcoming NBA and WNBA fixtures from API Ninjas, shown in your local time.</p></div><span class="page-status">● API NINJAS FEED</span></div><section class="page-panel fixtures-panel"><div class="fixture-toolbar"><div><div class="eyebrow small-eyebrow">MATCH SCHEDULE</div><h2>Upcoming fixtures</h2></div><button class="button button-quiet" type="button" data-refresh-basketball>↻ Refresh</button></div><div class="sports-fixture-list" id="basketball-fixture-list" aria-live="polite"><p class="fixture-message">Loading upcoming basketball fixtures…</p></div></section>${emptyNotice("MODEL PREDICTIONS PENDING", "Fixtures are not predictions.", "API Ninjas supplies upcoming schedules and results. Basketball predictions remain grey NO BET until a basketball model is built, evaluated, and passes calibration checks.")}<section class="page-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">CERTAINTY GUIDE</div><h2>Same calibrated scale for every market</h2></div></div><div class="certainty-legend page-legend"></div><p class="panel-footnote">A grey NO BET status applies whenever data quality, model calibration, odds freshness, or uncertainty checks fail.</p></section>`,
     picks: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> SHORTLIST</div><h1>Best picks<span class="title-period">.</span></h1><p class="subhead">Approved picks are ranked only after calibration and quality checks.</p></div></div>${emptyNotice("NO APPROVED BETS", "Experimental football leans are public.", "Today’s Model Lab board shows the leading model outcome and its probability for eligible matches. They are clearly marked experimental, and every selection remains NO BET until it passes approval gates.")}<div class="experimental-board-link"><span>PUBLIC DAILY EXPERIMENT</span><button class="button button-quiet" type="button" data-goto="model-lab">View today’s experimental picks →</button></div><section class="page-panel"><div class="eyebrow small-eyebrow">APPROVAL GATES</div><div class="principle-grid"><div><b>01</b><strong>Calibration</strong><small>Chronological held-out performance must support published probabilities.</small></div><div><b>02</b><strong>Data reliability</strong><small>Fixture data must be good quality and updated within seven days.</small></div><div><b>03</b><strong>Betting value</strong><small>Value remains a separate measure; no odds are currently assessed.</small></div></div></section>`,
     performance: `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRACK RECORD</div><h1>Performance<span class="title-period">.</span></h1><p class="subhead">A transparent record of published predictions and settled outcomes.</p></div></div><section class="stats-grid page-stats"><article class="stat-card"><div class="stat-heading">SETTLED PREDICTIONS</div><div class="stat-value">—</div><div class="stat-foot muted">No settled records</div></article><article class="stat-card"><div class="stat-heading">ACCURACY</div><div class="stat-value">—<small>%</small></div><div class="stat-foot muted">Not yet available</div></article><article class="stat-card"><div class="stat-heading">BRIER SCORE</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article><article class="stat-card"><div class="stat-heading">LOG LOSS</div><div class="stat-value">—</div><div class="stat-foot muted">Requires settled outcomes</div></article></section>${emptyNotice("NO SETTLED RESULTS", "The record begins when predictions are published.", "Performance will be calculated from the permanent prediction audit. No historical results or ROI are fabricated.")}`,
     "model-lab": `<div class="page-intro"><div><div class="eyebrow"><span class="eyebrow-line"></span> DAILY FOOTBALL BOARD</div><h1>Experimental picks<span class="title-period">.</span></h1><p class="subhead">Today’s model leans across competitions available in the football feed.</p></div><div class="shadow-page-actions"><span class="page-status shadow-status">EXPERIMENTAL · ALL NO BET</span><button class="button button-quiet" type="button" data-refresh-shadow>↻ Refresh today</button></div></div><section class="page-panel shadow-disclosure"><strong>Public experimental estimates · not betting recommendations</strong><p>Only matches scheduled for today are listed. For eligible matches, the leading model outcome and exact probability are shown as an experimental pick. Every match remains a grey NO BET because the models are unverified and betting value is not assessed. Estimates are hidden when fixture data quality is not good, source data is missing or older than seven days, or a league model is unavailable. Probabilities are not guarantees.</p></section><div id="shadow-lab-content" aria-live="polite"><p class="fixture-message">Loading today’s public experiment results…</p></div>`,
@@ -78,7 +78,8 @@
     const content = document.getElementById("page-content");
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
-    if (page === "football") loadFootballFixtures(content);
+    if (page === "football") loadSportFixtures(content, "football");
+    if (page === "basketball") loadSportFixtures(content, "basketball");
     if (page === "model-lab") loadShadowLab(content);
     if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
@@ -164,7 +165,8 @@
     const content = document.getElementById("page-content");
     content.innerHTML = page === "home" ? homeMarkup : (pageMarkup[page] || pageMarkup["match-analysis"]);
     content.querySelectorAll(".page-legend").forEach(renderLegend);
-    if (page === "football") loadFootballFixtures(content);
+    if (page === "football") loadSportFixtures(content, "football");
+    if (page === "basketball") loadSportFixtures(content, "basketball");
     if (page === "model-lab") loadShadowLab(content);
     if (page === "match-analysis") renderMatchAnalysis(content);
     content.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.goto)));
@@ -306,33 +308,33 @@
     }
   }
 
-  async function loadFootballFixtures(content) {
-    const list = content.querySelector("#football-fixture-list");
+  async function loadSportFixtures(content, sport) {
+    const list = content.querySelector(`#${sport}-fixture-list`);
     if (!list) return;
 
-    const refreshButton = content.querySelector("[data-refresh-football]");
+    const refreshButton = content.querySelector(`[data-refresh-${sport}]`);
     if (refreshButton) {
-      refreshButton.onclick = () => loadFootballFixtures(content);
+      refreshButton.onclick = () => loadSportFixtures(content, sport);
     }
 
     list.replaceChildren();
     const loading = document.createElement("p");
     loading.className = "fixture-message";
-    loading.textContent = "Loading upcoming football fixtures…";
+    loading.textContent = `Loading upcoming ${sport} fixtures…`;
     list.append(loading);
 
     try {
-      const response = await fetch("/api/fixtures?sport=football", { cache: "no-store" });
+      const response = await fetch(`/api/fixtures?sport=${sport}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Fixture service unavailable");
       const result = await response.json();
       const fixtures = (Array.isArray(result.fixtures) ? result.fixtures : [])
-        .filter((fixture) => fixture.sport === "football" && Number.isFinite(Date.parse(fixture.scheduled_at)) && Date.parse(fixture.scheduled_at) > Date.now())
+        .filter((fixture) => fixture.sport === sport && fixture.status === "scheduled" && Number.isFinite(Date.parse(fixture.scheduled_at)) && Date.parse(fixture.scheduled_at) > Date.now())
         .sort((a, b) => Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at));
 
       if (!fixtures.length) {
         const empty = document.createElement("p");
         empty.className = "fixture-message";
-        empty.textContent = "No upcoming football fixtures are available in the current feed.";
+        empty.textContent = `No upcoming ${sport} fixtures are available in the current feed.`;
         list.replaceChildren(empty);
         return;
       }
@@ -364,7 +366,7 @@
         meta.className = "fixture-card-meta";
         const competition = document.createElement("span");
         competition.className = "fixture-competition";
-        competition.textContent = fixture.competition || "Football";
+        competition.textContent = fixture.competition || (sport === "basketball" ? "Basketball" : "Football");
         const status = document.createElement("span");
         status.className = "fixture-status";
         status.textContent = "Scheduled";
@@ -392,7 +394,9 @@
         badge.setAttribute("aria-label", `${certainty.label}: ${certainty.reason}`);
         const reason = document.createElement("span");
         reason.className = "fixture-no-bet-reason";
-        reason.textContent = certainty.reason;
+        reason.textContent = sport === "basketball"
+          ? "No calibrated basketball prediction is available"
+          : certainty.reason;
         decision.append(badge, reason);
 
         const kickoff = document.createElement("time");
@@ -412,7 +416,7 @@
       retry.className = "text-button";
       retry.type = "button";
       retry.textContent = "Retry";
-      retry.addEventListener("click", () => loadFootballFixtures(content));
+      retry.addEventListener("click", () => loadSportFixtures(content, sport));
       list.replaceChildren(error, retry);
     }
   }
@@ -424,7 +428,7 @@
       target.innerHTML = emptyNotice(
         "NO MATCH SELECTED",
         "Match analysis uses verified inputs only.",
-        "Choose a fixture from the Football page. Since no calibrated prediction is currently available, the decision remains NO BET.",
+        "Choose a fixture from the Football or Basketball page. Since no calibrated prediction is currently available, the decision remains NO BET.",
       );
       return;
     }
@@ -434,7 +438,7 @@
     panel.className = "page-panel selected-match-panel";
     const competition = document.createElement("div");
     competition.className = "eyebrow small-eyebrow";
-    competition.textContent = fixture.competition || "Football";
+    competition.textContent = fixture.competition || (fixture.sport === "basketball" ? "Basketball" : "Football");
     const teams = document.createElement("h2");
     teams.className = "selected-match-teams";
     teams.textContent = `${fixture.home_team || "Home team"} vs ${fixture.away_team || "Away team"}`;
@@ -465,8 +469,9 @@
     const back = document.createElement("button");
     back.className = "button button-quiet selected-match-back";
     back.type = "button";
-    back.textContent = "Back to football fixtures";
-    back.addEventListener("click", () => showPage("football"));
+    const fixturePage = fixture.sport === "basketball" ? "basketball" : "football";
+    back.textContent = `Back to ${fixturePage} fixtures`;
+    back.addEventListener("click", () => showPage(fixturePage));
 
     panel.append(competition, teams, kickoff, decision, probability, back);
     target.replaceChildren(panel);
