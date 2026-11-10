@@ -74,29 +74,38 @@ function parseBoolean(value) {
   return null;
 }
 
-function rowIsHome(row, fields, team, opponent) {
-  if (fields.homeTeam && row[fields.homeTeam]) {
-    if (row[fields.homeTeam].toLowerCase() === team.toLowerCase()) return true;
-    if (row[fields.homeTeam].toLowerCase() === opponent.toLowerCase()) return false;
+function homeSideFromPair(pair, fields) {
+  if (pair.length !== 2) return null;
+  const [first, second] = pair;
+  const firstTeam = first[fields.team].toLowerCase();
+
+  for (const field of [fields.homeTeam, fields.awayTeam].filter(Boolean)) {
+    const values = pair.map((row) => row[field]?.trim().toLowerCase()).filter(Boolean);
+    if (values.length !== 2 || values[0] !== values[1]) continue;
+    const namedSide = values[0];
+    if (namedSide === firstTeam || namedSide === first[fields.opponent].toLowerCase()) {
+      const isHomeField = field === fields.homeTeam;
+      const firstIsNamedSide = namedSide === firstTeam;
+      return isHomeField ? (firstIsNamedSide ? first : second) : (firstIsNamedSide ? second : first);
+    }
   }
-  if (fields.awayTeam && row[fields.awayTeam]) {
-    if (row[fields.awayTeam].toLowerCase() === team.toLowerCase()) return false;
-    if (row[fields.awayTeam].toLowerCase() === opponent.toLowerCase()) return true;
-  }
-  if (fields.matchup && row[fields.matchup]) {
-    const matchup = row[fields.matchup].trim().toLowerCase();
-    const current = team.trim().toLowerCase();
+
+  for (const row of pair) {
+    const team = row[fields.team].trim().toLowerCase();
+    const matchup = row[fields.matchup]?.trim().toLowerCase();
+    if (!matchup) continue;
     const vs = matchup.match(/^(.+?)\s+vs\.?\s+(.+)$/);
-    if (vs && (vs[1].trim() === current || vs[2].trim() === current)) return vs[1].trim() === current;
+    if (vs && (vs[1].trim() === team || vs[2].trim() === team)) return vs[1].trim() === team ? row : pair.find((entry) => entry !== row);
     const at = matchup.match(/^(.+?)\s*@\s*(.+)$/);
-    if (at && (at[1].trim() === current || at[2].trim() === current)) return at[2].trim() === current;
+    if (at && (at[1].trim() === team || at[2].trim() === team)) return at[2].trim() === team ? row : pair.find((entry) => entry !== row);
   }
+
   for (const field of fields.homeFlags) {
-    if (!(field in row) || !row[field]) continue;
-    const bool = parseBoolean(row[field]);
-    if (bool !== null) return bool;
+    const values = pair.map((row) => parseBoolean(row[field]));
+    if (values[0] === true && values[1] === false) return first;
+    if (values[0] === false && values[1] === true) return second;
   }
-  throw new Error(`Could not determine home/away for ${team} vs ${opponent}. CSV needs a home/away, venue, or matchup field.`);
+  return null;
 }
 
 async function downloadSeason(season) {
@@ -130,22 +139,33 @@ async function downloadSeason(season) {
     const points = Number(row[fields.points]);
     const opponentPoints = Number(row[fields.opponentPoints]);
     if (!Number.isFinite(time) || !team || !opponent || !Number.isFinite(points) || !Number.isFinite(opponentPoints) || points === opponentPoints) continue;
-    const home = rowIsHome(row, fields, team, opponent);
     const date = /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
       ? dateValue
       : new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(time));
     const pair = [team, opponent].sort((a, b) => a.localeCompare(b)).join("|");
-    const id = fields.gameId && row[fields.gameId] ? row[fields.gameId] : `${date}|${pair}`;
-    const key = `${season}|${id}`;
-    const game = groups.get(key) ?? { season, id, date, home_team: null, away_team: null, home_score: null, away_score: null };
-    const expectedTeam = home ? "home_team" : "away_team";
-    const expectedScore = home ? "home_score" : "away_score";
-    if (game[expectedTeam] && game[expectedTeam] !== team) throw new Error(`Conflicting team rows for game ${key}.`);
-    game[expectedTeam] = team;
-    game[expectedScore] = points;
-    groups.set(key, game);
+    const key = `${season}|${date}|${pair}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ ...row, __date: date, __team: team, __opponent: opponent, __points: points, __opponent_points: opponentPoints });
   }
-  const games = [...groups.values()].filter((game) => game.home_team && game.away_team && Number.isFinite(game.home_score) && Number.isFinite(game.away_score));
+  const games = [];
+  for (const [key, pair] of groups) {
+    if (pair.length !== 2) continue;
+    const homeRow = homeSideFromPair(pair, fields);
+    if (!homeRow) {
+      const indicators = Object.fromEntries([...fields.homeFlags, fields.homeTeam, fields.awayTeam, fields.matchup].filter(Boolean).map((field) => [field, pair.map((row) => row[field])]));
+      throw new Error(`Could not unambiguously identify the home team for ${key}. CSV indicators: ${JSON.stringify(indicators)}. No metrics were produced.`);
+    }
+    const awayRow = pair.find((row) => row !== homeRow);
+    games.push({
+      season,
+      id: fields.gameId ? (homeRow[fields.gameId] || awayRow[fields.gameId] || key) : key,
+      date: homeRow.__date,
+      home_team: homeRow.__team,
+      away_team: awayRow.__team,
+      home_score: homeRow.__points,
+      away_score: awayRow.__points,
+    });
+  }
   if (games.length < 1000) throw new Error(`${season} produced only ${games.length} paired regular-season games from ${records.length} rows; refusing to evaluate incomplete input.`);
   return games.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 }
