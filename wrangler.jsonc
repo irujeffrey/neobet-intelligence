@@ -4,7 +4,7 @@
   "main": "./src/index.js",
   "compatibility_date": "2026-11-06",
   "vars": {
-    "BASKETBALL_PUBLIC_EXPERIMENT_LICENSE": "enable",
+    "BASKETBALL_PUBLIC_EXPERIMENT_LICENSE": "disable",
 
   },
   "d1_databases": [
