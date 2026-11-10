@@ -96,20 +96,15 @@ async function api(request, env, url) {
       return json({ error: "date must be a valid YYYY-MM-DD date" }, 400);
     }
 
-        const now = new Date();
-    const from = now.toISOString();
+    const now = new Date();
+    const from = matchDate
+      ? `${matchDate}T00:00:00.000Z`
+      : new Date(now.getTime() - 14 * 86400000).toISOString();
     const to = matchDate
-      ? new Date(
-          new Date(`${matchDate}T00:00:00.000Z`).getTime() + 86400000,
-        ).toISOString()
+      ? new Date(new Date(`${matchDate}T00:00:00.000Z`).getTime() + 86400000).toISOString()
       : new Date(now.getTime() + 30 * 86400000).toISOString();
-           const conditions = ["f.scheduled_at >= ?", "f.scheduled_at < ?"];
+    const conditions = ["f.scheduled_at >= ?", "f.scheduled_at < ?"];
     const bindings = [from, to];
-
-    if (matchDate) {
-      conditions.push("substr(f.scheduled_at, 1, 10) = ?");
-      bindings.push(matchDate);
-    }
     if (sport) {
       conditions.push("f.sport = ?");
       bindings.push(sport);
@@ -133,6 +128,114 @@ async function api(request, env, url) {
       return json({ fixtures: result.results || [] });
     } catch {
       return json({ error: "Fixtures are temporarily unavailable" }, 503);
+    }
+  }
+
+  if (url.pathname === "/api/shadow-lab") {
+    if (!env.DB) return json({ error: "Database is not configured" }, 503);
+    const modelProfiles = [
+      { id: "football-poisson-dirichlet-shadow-0-1-0", competition: "Premier League" },
+      { id: "football-poisson-dirichlet-shadow-pt-1-0-1-0", competition: "Primeira Liga" },
+    ];
+    try {
+      const ids = modelProfiles.map((profile) => `'${profile.id}'`).join(",");
+      const result = await env.DB.prepare(`
+        SELECT p.fixture_id, p.model_version_id, p.selection, p.probability, p.created_at,
+          f.scheduled_at, f.status, f.home_score, f.away_score,
+          competition.name AS competition, home.name AS home_team, away.name AS away_team
+        FROM predictions AS p
+        JOIN fixtures AS f ON f.id = p.fixture_id
+        LEFT JOIN competitions AS competition ON competition.id = f.competition_id
+        JOIN teams AS home ON home.id = f.home_team_id
+        JOIN teams AS away ON away.id = f.away_team_id
+        WHERE p.model_version_id IN (${ids}) AND p.sport = 'football'
+          AND p.status = 'draft' AND p.decision = 'no_bet' AND p.calibrated = 0
+          AND p.market = '1X2'
+        ORDER BY f.scheduled_at DESC
+        LIMIT 6000
+      `).all();
+      const rows = result.results || [];
+      const groups = new Map();
+      for (const row of rows) {
+        if (!Number.isFinite(Date.parse(row.scheduled_at)) || !Number.isFinite(Date.parse(row.created_at)) ||
+          !["home", "draw", "away"].includes(row.selection) || !Number.isFinite(row.probability)) continue;
+        const key = `${row.model_version_id}|${row.fixture_id}`;
+        if (!groups.has(key)) groups.set(key, {
+          model_version_id: row.model_version_id, competition: row.competition,
+          fixture_id: row.fixture_id, scheduled_at: row.scheduled_at, status: row.status,
+          home_team: row.home_team, away_team: row.away_team,
+          home_score: row.home_score, away_score: row.away_score,
+          created_at: row.created_at, probabilities: {},
+        });
+        groups.get(key).probabilities[row.selection] = row.probability;
+      }
+      const now = Date.now();
+      const complete = [...groups.values()].filter((match) => {
+        const outcomes = ["home", "draw", "away"];
+        if (outcomes.some((outcome) => !Number.isFinite(match.probabilities[outcome]))) return false;
+        const total = outcomes.reduce((sum, outcome) => sum + match.probabilities[outcome], 0);
+        return Math.abs(total - 1) <= 0.002 && Date.parse(match.created_at) < Date.parse(match.scheduled_at);
+      });
+      const score = (matches) => {
+        let correct = 0;
+        let brier = 0;
+        let logLoss = 0;
+        const bins = Object.fromEntries(["home", "draw", "away"].map((outcome) => [outcome,
+          Array.from({ length: 10 }, () => ({ n: 0, predicted: 0, observed: 0 }))]));
+        for (const match of matches) {
+          const actual = match.home_score > match.away_score ? "home" : match.home_score === match.away_score ? "draw" : "away";
+          const predicted = ["home", "draw", "away"].reduce((best, outcome) =>
+            match.probabilities[outcome] > match.probabilities[best] ? outcome : best, "home");
+          if (predicted === actual) correct += 1;
+          for (const outcome of ["home", "draw", "away"]) {
+            const probability = match.probabilities[outcome];
+            const observed = actual === outcome ? 1 : 0;
+            brier += (probability - observed) ** 2;
+            if (outcome === actual) logLoss -= Math.log(Math.max(1e-15, probability));
+            const bin = bins[outcome][Math.min(9, Math.floor(probability * 10))];
+            bin.n += 1; bin.predicted += probability; bin.observed += observed;
+          }
+        }
+        let eceTotal = 0;
+        let outcomeCount = 0;
+        for (const outcome of ["home", "draw", "away"]) {
+          const outcomeN = bins[outcome].reduce((sum, bin) => sum + bin.n, 0);
+          if (!outcomeN) continue;
+          const ece = bins[outcome].reduce((sum, bin) => sum + (bin.n / outcomeN) *
+            (bin.n ? Math.abs(bin.predicted / bin.n - bin.observed / bin.n) : 0), 0);
+          eceTotal += ece; outcomeCount += 1;
+        }
+        return matches.length ? {
+          settled_matches: matches.length, accuracy: correct / matches.length,
+          multiclass_brier_score: brier / matches.length,
+          log_loss: logLoss / matches.length,
+          mean_one_vs_rest_ece: outcomeCount ? eceTotal / outcomeCount : null,
+        } : { settled_matches: 0, accuracy: null, multiclass_brier_score: null, log_loss: null, mean_one_vs_rest_ece: null };
+      };
+      const leagues = modelProfiles.map((profile) => {
+        const profileMatches = complete.filter((match) => match.model_version_id === profile.id);
+        const settled = profileMatches.filter((match) => match.status === "finished" &&
+          Number.isInteger(match.home_score) && Number.isInteger(match.away_score));
+        const upcoming = profileMatches.filter((match) => match.status === "scheduled" && Date.parse(match.scheduled_at) > now)
+          .sort((a, b) => Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at));
+        const recentSettled = [...settled].sort((a, b) => Date.parse(b.scheduled_at) - Date.parse(a.scheduled_at)).slice(0, 60)
+          .map(({ fixture_id, scheduled_at, home_team, away_team, home_score, away_score, probabilities }) => ({
+            fixture_id, scheduled_at, home_team, away_team, home_score, away_score, probabilities,
+            actual: home_score > away_score ? "home" : home_score === away_score ? "draw" : "away",
+          }));
+        return {
+          competition: profile.competition,
+          model_status: "unverified shadow experiment; not approved for public picks",
+          metrics: score(settled),
+          upcoming: upcoming.slice(0, 30).map(({ fixture_id, scheduled_at, home_team, away_team, probabilities }) => ({
+            fixture_id, scheduled_at, home_team, away_team, probabilities, decision: "NO BET",
+          })),
+          recent_settled: recentSettled,
+        };
+      });
+      return json({ generated_at: new Date().toISOString(), publication_status: "public experimental results; no approved picks", leagues });
+    } catch {
+      return json({ error: "Shadow experiment results are temporarily unavailable" }, 503);
     }
   }
 
