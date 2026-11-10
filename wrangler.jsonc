@@ -3,6 +3,9 @@
   "name": "neobet-intelligence",
   "main": "./src/index.js",
   "compatibility_date": "2026-11-06",
+  "vars": {
+    "BASKETBALL_PUBLIC_EXPERIMENT_LICENSE": "disabled"
+  },
   "d1_databases": [
     {
       "binding": "DB",

@@ -6,11 +6,15 @@ Responsive, zero-dependency website foundation for transparent football and bask
 
 No local preview or test command is required. GitHub Actions checks JavaScript syntax and confirms the homepage, stylesheet, and JavaScript asset respond. Provider sync and remote D1 import also run on GitHub-hosted runners.
 
+The historical football-results workflow refreshes OpenFootball results daily at 05:00 UTC. After a successful import, **Evaluate NeoBet football baseline** runs automatically and updates the forward-only Premier League report in GitHub Actions. Its results remain evaluation-only; the workflow does not publish picks or remove NO BET safeguards.
+
 ## Basketball cross-season evaluation
 
 The **Evaluate NeoBet NBA cross-season model** workflow downloads BoxScore Lab NBA team-game CSVs on the GitHub runner, pairs each game's two team rows, and evaluates an Elo probability baseline across complete seasons. It uses 2022-23 as a warm-up, selects Elo settings using only 2023-24, fits a single probability temperature on 2024-25, then reports tuned and fixed-reference Elo plus a home-win-rate baseline on the untouched 2025-26 season. Ratings update only after all games on a date and regress toward the league mean between seasons. The ongoing 2026-27 season is excluded. The workflow summary includes Brier score, log loss, accuracy, and ECE; a 90-day JSON artifact contains detailed calibration bins and the tuning record.
 
 The source CSVs are published by [BoxScore Lab](https://www.boxscorelab.com/downloads/) under CC BY 4.0. Reports include attribution and retrieval date. The evaluation is NBA-only, score-history-only, and not evidence of betting value or approval for public picks. WNBA and public basketball selections remain NO BET.
+
+The **Monitor NeoBet NBA shadow forecasts** workflow runs after the daily sports sync. It stores only draft, uncalibrated, NO BET rows for eligible same-day NBA fixtures, then reports prospective settled-game metrics in GitHub Actions. It uses the fixed Elo reference as the benchmark because the tuned settings did not improve the 2025-26 held-out scores. The current-season shadow starts teams at 1500, uses earlier finished 2026-27 results only, excludes same-date results from that date's ratings, and requires good-quality fixtures with recent source updates. The Basketball page has a public daily experimental-pick board, but the API is gated off by default: current [API Ninjas terms](https://api-ninjas.com/tos) prohibit sharing Free-plan output with third parties. Set `BASKETBALL_PUBLIC_EXPERIMENT_LICENSE` to `approved` in `wrangler.jsonc` and redeploy only when the active plan or written permission expressly allows public display. The board always labels displayed results experimental and NO BET; it reports prospective calibration metrics separately from uncalibrated probabilities.
 
 ## Certainty system
 
