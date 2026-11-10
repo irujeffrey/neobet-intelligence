@@ -9,7 +9,7 @@
 - Football fixture cards open a match-analysis view and show grey NO BET while no calibrated public prediction exists.
 - Basketball page reads the existing NBA/WNBA API Ninjas fixtures endpoint and shows upcoming games as responsive cards with league, teams, local kickoff, and grey NO BET status. Cards open the shared match-analysis page.
 - A private GitHub evaluation workflow scores an Elo basketball baseline chronologically from completed NBA/WNBA results already stored in D1. It uses 60% initial dates, 20% validation for temperature calibration, and the final 20% as a prequential holdout; games on the same Eastern Time date do not update ratings until the next date. It reports insufficient history instead of pretending to evaluate a tiny sample, and never publishes picks.
-- A separate GitHub-only NBA cross-season evaluator downloads paired team-game rows from BoxScore Lab's CC BY 4.0 CSVs, carries Elo ratings forward with season-boundary regression, fits temperature only on 2024-25, and reports a fully held-out 2025-26 season. It excludes ongoing 2026-27 and leaves WNBA outside this dataset-specific evaluation. It is evaluation-only and cannot approve public basketball picks.
+- A separate GitHub-only NBA cross-season evaluator downloads paired team-game rows from BoxScore Lab's CC BY 4.0 CSVs, uses 2022-23 as a rating warm-up, selects Elo settings only on 2023-24, fits temperature only on 2024-25, and reports the untouched 2025-26 season. It excludes ongoing 2026-27 and leaves WNBA outside this dataset-specific evaluation. It is evaluation-only and cannot approve public basketball picks.
 - Daily successful sports-data sync triggers a GitHub workflow that generates Premier League and Primeira Liga shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
 - Each shadow league fits its own Dirichlet calibration on its latest three complete seasons and stores forecasts under a separate unverified model version.
 - Shadow generation triggers a GitHub review workflow that scores finished forecasts separately by league with accuracy, Brier score, log loss, and calibration bins.
@@ -35,7 +35,7 @@
 
 - Shadow sample size and forward evaluation; other leagues remain excluded until their historical coverage and held-out metrics support a shadow trial.
 - Public calibrated prediction generation, settlement ingestion, and performance dashboards.
-- Run **Evaluate NeoBet NBA cross-season model** manually from GitHub Actions and inspect the summary and 90-day JSON artifact. If BoxScore Lab changes its CSV headers or coverage, the workflow fails with the headers/season counts rather than reporting partial data.
+- Upload the parameter-selection update to `scripts/evaluate-basketball-cross-season.mjs`, then run **Evaluate NeoBet NBA cross-season model** manually from GitHub Actions and inspect the summary and 90-day JSON artifact. The run compares a fixed Elo reference, train-season-selected Elo, temperature scaling, and the pre-test home-rate baseline; it does not authorize public picks. If BoxScore Lab changes its CSV headers or coverage, the workflow fails rather than reporting partial data.
 - Confirm each provider account's current quota before increasing the competitions or sync frequency.
 
 All validation and provider sync runs are intended to run on GitHub-hosted runners. No local testing is required.
