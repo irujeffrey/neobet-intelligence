@@ -75,18 +75,26 @@ function parseBoolean(value) {
 }
 
 function rowIsHome(row, fields, team, opponent) {
-  for (const field of fields.homeFlags) {
-    if (!(field in row) || !row[field]) continue;
-    const value = row[field].trim();
-    const bool = parseBoolean(value);
-    if (bool !== null) return bool;
-    if (value.toLowerCase() === team.toLowerCase()) return true;
-    if (value.toLowerCase() === opponent.toLowerCase()) return false;
+  if (fields.homeTeam && row[fields.homeTeam]) {
+    if (row[fields.homeTeam].toLowerCase() === team.toLowerCase()) return true;
+    if (row[fields.homeTeam].toLowerCase() === opponent.toLowerCase()) return false;
+  }
+  if (fields.awayTeam && row[fields.awayTeam]) {
+    if (row[fields.awayTeam].toLowerCase() === team.toLowerCase()) return false;
+    if (row[fields.awayTeam].toLowerCase() === opponent.toLowerCase()) return true;
   }
   if (fields.matchup && row[fields.matchup]) {
-    const matchup = row[fields.matchup].toLowerCase();
-    if (/\bvs\.?\s/.test(matchup)) return true;
-    if (matchup.includes(" @ ")) return false;
+    const matchup = row[fields.matchup].trim().toLowerCase();
+    const current = team.trim().toLowerCase();
+    const vs = matchup.match(/^(.+?)\s+vs\.?\s+(.+)$/);
+    if (vs && (vs[1].trim() === current || vs[2].trim() === current)) return vs[1].trim() === current;
+    const at = matchup.match(/^(.+?)\s*@\s*(.+)$/);
+    if (at && (at[1].trim() === current || at[2].trim() === current)) return at[2].trim() === current;
+  }
+  for (const field of fields.homeFlags) {
+    if (!(field in row) || !row[field]) continue;
+    const bool = parseBoolean(row[field]);
+    if (bool !== null) return bool;
   }
   throw new Error(`Could not determine home/away for ${team} vs ${opponent}. CSV needs a home/away, venue, or matchup field.`);
 }
@@ -104,10 +112,12 @@ async function downloadSeason(season) {
     points: requiredField(headers, ["points", "pts", "team_points", "team_score", "score"], "team score"),
     opponentPoints: requiredField(headers, ["opponent_points", "opp_points", "opponent_pts", "opp_pts", "opponent_score", "opp_score"], "opponent score"),
     gameId: findField(headers, ["game_id", "gameid", "id"]),
-    homeFlags: ["is_home", "home", "home_away", "homeaway", "location", "venue", "site"].filter((field) => headers.includes(field)),
+    homeTeam: findField(headers, ["home_team", "home_team_name", "home_team_abbreviation", "home_team_abbr"]),
+    awayTeam: findField(headers, ["away_team", "away_team_name", "away_team_abbreviation", "away_team_abbr", "visitor_team"]),
+    homeFlags: ["is_home", "home_away", "homeaway", "location", "venue", "site", "home"].filter((field) => headers.includes(field)),
     matchup: findField(headers, ["matchup", "match_up", "game_matchup"]),
   };
-  if (!fields.homeFlags.length && !fields.matchup) {
+  if (!fields.homeFlags.length && !fields.matchup && !fields.homeTeam && !fields.awayTeam) {
     throw new Error(`Could not identify a home/away or matchup column in ${season}. Headers received: ${headers.join(", ")}`);
   }
 
