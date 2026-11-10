@@ -7,6 +7,7 @@
 - D1 database and initial schema. The user confirmed `/api/health` reports `database: connected` and `schema: ready`.
 - Read-only Worker APIs for health, fixtures, sync status, and published predictions.
 - Football fixture cards open a match-analysis view and show grey NO BET while no calibrated public prediction exists.
+- Basketball page reads the existing NBA/WNBA API Ninjas fixtures endpoint and shows upcoming games as responsive cards with league, teams, local kickoff, and grey NO BET status. Cards open the shared match-analysis page.
 - Daily successful sports-data sync triggers a GitHub workflow that generates Premier League and Primeira Liga shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
 - Each shadow league fits its own Dirichlet calibration on its latest three complete seasons and stores forecasts under a separate unverified model version.
 - Shadow generation triggers a GitHub review workflow that scores finished forecasts separately by league with accuracy, Brier score, log loss, and calibration bins.
