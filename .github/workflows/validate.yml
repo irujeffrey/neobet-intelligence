@@ -30,6 +30,9 @@ jobs:
           node --check scripts/generate-football-shadow-predictions.mjs
           node --check scripts/evaluate-football-shadow-predictions.mjs
           node --check scripts/evaluate-basketball-model.mjs
+          node --check scripts/evaluate-basketball-cross-season.mjs
+          node --check scripts/generate-basketball-shadow-predictions.mjs
+          node --check scripts/evaluate-basketball-shadow-predictions.mjs
           node --check scripts/evaluate-football-competitions.mjs
           node --check scripts/import-football-history.mjs
 
