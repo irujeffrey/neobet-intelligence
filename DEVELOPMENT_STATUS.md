@@ -10,6 +10,7 @@
 - Daily successful sports-data sync triggers a GitHub workflow that generates Premier League and Primeira Liga shadow forecasts as draft NO BET rows; they are excluded from the public predictions API.
 - Each shadow league fits its own Dirichlet calibration on its latest three complete seasons and stores forecasts under a separate unverified model version.
 - Shadow generation triggers a GitHub review workflow that scores finished forecasts separately by league with accuracy, Brier score, log loss, and calibration bins.
+- Shadow review reports each league's own settled-match count and provisional/ongoing monitoring state; reaching the 100-match monitoring threshold is not publication approval.
 - Multi-competition historical import and a league-by-league chronological evaluation workflow are prepared for Premier League, Championship, Primeira Liga, Italian Serie A, and Brazilian Série A.
 - Provider sync prepared for football-data.org football fixtures/results and API Ninjas NBA/WNBA schedules/results.
 - Provider credentials are read only by the GitHub Actions sync job and are never put in the browser or Worker.
