@@ -473,7 +473,7 @@ async function api(request, env, url) {
 
 
 
-  if (url.pathname === "/api/gemini-analysis") {
+
     if (!env.DB) {
       return json({ error: "Database is not configured" }, 503);
     }
