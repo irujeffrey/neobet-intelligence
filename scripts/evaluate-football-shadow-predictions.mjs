@@ -9,6 +9,7 @@ const MODEL_VERSION_IDS = [
   "football-poisson-dirichlet-shadow-pt-1-0-1-0",
 ];
 const OUTCOMES = ["home", "draw", "away"];
+const MIN_SHADOW_MATCHES = 100;
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -116,12 +117,13 @@ function markdown(report) {
     `- **Status:** ${report.status}`,
     "- **Publication:** all forecasts remain drafts with NO BET decisions; this report does not authorize public picks.",
     "- **Scoring:** only finished fixtures with all three 1X2 probabilities recorded before scheduled kickoff are included.",
+    `- **Monitoring threshold:** fewer than ${MIN_SHADOW_MATCHES} settled forecasts for a league is provisional; reaching the threshold is not approval for public predictions.`,
     "",
-    "| Sample | Accuracy | Multiclass Brier (lower is better) | Log loss (lower is better) | Mean one-vs-rest ECE (lower is better) |",
-    "|---:|---:|---:|---:|---:|",
+    "| League model | Settled matches | Monitoring state | Accuracy | Multiclass Brier (lower is better) | Log loss (lower is better) | Mean one-vs-rest ECE (lower is better) |",
+    "|---|---:|---|---:|---:|---:|---:|",
   ];
   for (const [modelId, result] of Object.entries(report.by_model)) {
-    lines.push(`| ${modelId} (${result.scored.matches} matches) | ${pct(result.scored.accuracy)} | ${metric(result.scored.multiclass_brier_score)} | ${metric(result.scored.log_loss)} | ${pct(result.scored.mean_one_vs_rest_ece)} |`);
+    lines.push(`| ${modelId} | ${result.scored.matches} | ${result.status} | ${pct(result.scored.accuracy)} | ${metric(result.scored.multiclass_brier_score)} | ${metric(result.scored.log_loss)} | ${pct(result.scored.mean_one_vs_rest_ece)} |`);
   }
   if (report.scored.matches) {
     for (const [modelId, model] of Object.entries(report.by_model)) {
@@ -174,13 +176,19 @@ async function main() {
     scored,
     by_model: Object.fromEntries(MODEL_VERSION_IDS.map((modelVersionId) => {
       const modelMatches = matches.filter((match) => match.model_version_id === modelVersionId);
-      return [modelVersionId, { scored: score(modelMatches), matches: modelMatches.map((match) => ({
+      const modelScore = score(modelMatches);
+      return [modelVersionId, {
+        scored: modelScore,
+        status: modelMatches.length < MIN_SHADOW_MATCHES ? "PROVISIONAL_SHADOW_SAMPLE" : "ONGOING_SHADOW_MONITORING",
+        minimum_matches_for_ongoing_monitoring: MIN_SHADOW_MATCHES,
+        matches: modelMatches.map((match) => ({
         fixture_id: match.fixture_id, competition: match.competition, home_team: match.home_team,
         away_team: match.away_team, scheduled_at: match.scheduled_at, actual: match.actual,
         probabilities: match.probabilities,
-      })) }];
+        })),
+      }];
     })),
-    status: matches.length < 100 ? "PROVISIONAL_SHADOW_SAMPLE" : "ONGOING_SHADOW_MONITORING",
+    status: matches.length < MIN_SHADOW_MATCHES ? "PROVISIONAL_SHADOW_SAMPLE" : "ONGOING_SHADOW_MONITORING",
     note: "Draft-only; no public predictions or betting recommendations.",
     matches: matches.map((match) => ({
       fixture_id: match.fixture_id,
