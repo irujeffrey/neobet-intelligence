@@ -474,9 +474,7 @@ async function api(request, env, url) {
 
 
 
-    if (!env.DB) {
-      return json({ error: "Database is not configured" }, 503);
-    }
+    
 
     const fixtureId = url.searchParams.get("fixture_id");
 
