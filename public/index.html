@@ -7,7 +7,9 @@
     <meta name="description" content="NeoBet Intelligence — transparent football and basketball analysis, calibrated probabilities, and an auditable prediction record." />
     <title>NeoBet Intelligence — Sports analysis, without the noise</title>
     <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="stylesheet" href="/src/best-picks.css" />
     <script src="/src/app.js" defer></script>
+    <script src="/src/best-picks.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -38,20 +40,17 @@
           <div class="profile-row"><div class="avatar">N</div><div><strong>NeoBet Intelligence</strong><small>Public preview</small></div><span class="more">···</span></div>
         </div>
       </aside>
-
       <main class="main-area">
         <header class="topbar">
           <button class="mobile-menu" id="mobile-menu" aria-label="Toggle navigation">☰</button>
           <div class="breadcrumbs"><span>Workspace</span><span class="crumb-sep">/</span><strong id="current-crumb">Overview</strong></div>
           <div class="topbar-right"><span class="date-pill"><span class="live-dot"></span> DEMO ENVIRONMENT</span><button class="icon-button" aria-label="Notifications">♧</button><div class="avatar small-avatar">N</div></div>
         </header>
-
         <div class="content" id="page-content">
           <section class="welcome-row">
-          <div><div class="eyebrow"><span class="eyebrow-line"></span> FRIDAY, NOVEMBER 6, 2026</div><h1>Good afternoon<span class="title-period">.</span></h1><p class="subhead">A clearer view of the games that matter.</p></div>
+            <div><div class="eyebrow"><span class="eyebrow-line"></span> FRIDAY, NOVEMBER 6, 2026</div><h1>Good afternoon<span class="title-period">.</span></h1><p class="subhead">A clearer view of the games that matter.</p></div>
             <button class="button button-quiet" id="refresh-button"><span>↻</span> Refresh data</button>
           </section>
-
           <section class="hero-panel">
             <div class="hero-grid"></div><div class="hero-content">
               <div class="hero-kicker"><span class="spark">✳</span> THE INTELLIGENCE BRIEF</div>
@@ -62,26 +61,21 @@
             <div class="hero-orbit" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div><div class="orbit-core"><span>NB</span></div><div class="orbit-dot"></div></div>
             <div class="hero-index">01 <span>/</span> 04</div>
           </section>
-
           <section class="stats-grid" aria-label="Prediction overview">
             <article class="stat-card"><div class="stat-heading">PREDICTIONS TODAY <span class="stat-icon blue">✳</span></div><div class="stat-value">—</div><div class="stat-foot"><span class="muted">Awaiting verified data</span></div></article>
             <article class="stat-card"><div class="stat-heading">BEST PICK PROBABILITY <span class="stat-icon green">↗</span></div><div class="stat-value">—<small>%</small></div><div class="stat-foot"><span class="muted">No calibrated picks yet</span></div></article>
             <article class="stat-card"><div class="stat-heading">RECORD THIS SEASON <span class="stat-icon violet">▤</span></div><div class="stat-value">— <small class="stat-divider">/</small> —</div><div class="stat-foot"><span class="muted">No settled predictions yet</span></div></article>
             <article class="stat-card"><div class="stat-heading">PROVIDER SYNC <span class="stat-icon amber">◉</span></div><div class="stat-value status-value" id="provider-sync-value"><span class="quality-mark"></span>Waiting</div><div class="stat-foot"><span class="muted" id="provider-sync-foot">Run the sync from GitHub Actions</span></div></article>
           </section>
-
           <section class="section-block">
             <div class="section-heading"><div><div class="eyebrow small-eyebrow">YOUR DAILY LINEUP</div><h2>Today’s predictions</h2></div><div class="sport-tabs" role="tablist" aria-label="Filter predictions by sport"><button class="sport-tab selected" data-sport="all" role="tab" aria-selected="true">All sports <span>0</span></button><button class="sport-tab" data-sport="football" role="tab" aria-selected="false">Football <span>0</span></button><button class="sport-tab" data-sport="basketball" role="tab" aria-selected="false">Basketball <span>0</span></button></div></div>
             <div class="empty-state"><div class="empty-graphic"><div class="empty-ring ring-a"></div><div class="empty-ring ring-b"></div><span>✳</span></div><div class="empty-copy"><div class="empty-label"><span></span> NO CALIBRATED PREDICTIONS</div><h3>Your next insight is on its way.</h3><p>Provider fixtures are stored in the database. Picks appear here only after a calibrated model produces outputs that pass quality checks.</p><button class="text-button" data-goto="methodology">See how predictions are made <span>→</span></button></div><div class="empty-aside"><span class="aside-icon">⌁</span><strong>No data, no guesswork.</strong><small>We don’t invent fixtures, odds or predictions.</small></div></div>
           </section>
-
           <div class="lower-grid">
             <section class="panel-section picks-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">THE SHORTLIST</div><h2>Best picks</h2></div><a class="view-all" href="#picks">View all <span>→</span></a></div><div class="compact-empty"><div class="compact-icon">✳</div><div><strong>No picks to rank yet</strong><p>Only reliable, calibrated predictions can make the shortlist.</p></div></div></section>
             <section class="panel-section performance-panel"><div class="panel-heading"><div><div class="eyebrow small-eyebrow">TRACK RECORD</div><h2>Performance</h2></div><a class="view-all" href="#performance">Full report <span>→</span></a></div><div class="chart-empty"><div class="chart-gridlines"><i></i><i></i><i></i><i></i></div><div class="chart-empty-message"><span>↗</span><strong>Performance starts with the first settled pick.</strong><small>Historical results are never backfilled or hidden.</small></div><div class="chart-axis"><span>WEEK 01</span><span>WEEK 02</span><span>WEEK 03</span><span>WEEK 04</span></div></div></section>
           </div>
-
           <section class="certainty-section" id="certainty-guide"><div class="certainty-top"><div><div class="eyebrow small-eyebrow">ONE SCALE. EVERY SPORT.</div><h2>Certainty, clearly shown.</h2></div><p>Colours reflect calibrated model probability.<br />They never promise an outcome.</p></div><div class="certainty-legend" id="certainty-legend" aria-label="Certainty probability legend"></div><div class="certainty-note"><span>ⓘ</span> Probability, model confidence, data quality and betting value are separate measurements. If data is unreliable, the status is <strong>NO BET</strong>.</div></section>
-
           <footer class="footer"><div class="footer-brand"><span class="footer-mark">N</span> NEOBET INTELLIGENCE <span class="footer-copy">© 2026 NeoBet Intelligence</span></div><div class="footer-links"><a href="#methodology">Methodology</a><a href="#responsible">Responsible use</a><a href="#privacy">Privacy</a><a href="#terms">Terms</a></div><div class="footer-disclaimer">Football data provided by the Football-Data.org API · Basketball data provided by API Ninjas. For information and entertainment. Predictions are uncertain and are not financial advice.</div></footer>
         </div>
       </main>
