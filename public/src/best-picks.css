@@ -1,0 +1,15 @@
+/* NeoBet combined Best Picks shortlist */
+.neo-best-picks-heading{align-items:flex-end;gap:14px}
+.neo-best-picks-heading h1{margin:10px 0 4px}
+.neo-best-picks-heading button{flex-shrink:0}
+.neo-best-picks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.neo-best-pick-card{margin:0;display:flex;flex-direction:column;gap:9px}
+.neo-best-pick-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.neo-best-pick-card h2{font-size:17px;line-height:1.35;margin:5px 0 0}
+.neo-best-pick-card .panel-footnote{margin:0}
+.neo-best-pick-selection{font-size:12px;color:#b9c9d8;margin:5px 0 0}
+.neo-best-pick-probability{font:700 27px Manrope,sans-serif;color:#dceaf6;letter-spacing:-.5px}
+@media(max-width:620px){
+  .neo-best-picks-heading{align-items:flex-start;flex-direction:column}
+  .neo-best-picks-grid{grid-template-columns:1fr}
+}
